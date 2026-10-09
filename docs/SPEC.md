@@ -892,7 +892,7 @@ Findings are matched by `key`. A finding has **changed** when its outcome, reaso
 
 - **Bytes only.** Outputs are encoded to UTF-8 bytes in memory, with `\n` line endings and one trailing newline. Each is written to `<name>.tmp.<pid>` in the target directory, flushed, `os.fsync`ed, and moved into place with `os.replace`. Text-mode writes are forbidden.
 - **The `--out` directory** MUST be absent or empty unless `--force` is given.
-  - With `--force`, only this tool's own output names are deleted before writing: `assessment.json`, `report.html`, `run-manifest.json`, `comparison.json`, `index.html`, and the scenario subdirectories that `demo` itself created.
+  - With `--force`, only this tool's own output names are deleted before writing: `assessment.json`, `report.html`, `run-manifest.json`, `comparison.json`, `index.html`, `evaluation_ids.json` (D-002), and the scenario subdirectories that `demo` itself created.
   - Nothing outside `--out` is ever deleted.
 - **Failure.** Evaluation completes in memory before any output is written. If a write fails, every file this run wrote is removed and the run exits 2.
 
@@ -1542,7 +1542,7 @@ These rules are part of the specification because the build runs on that machine
 | **B2** normalize | `adapters/qb_export.py`, the `normalize` command, `assess --export` | conversion, reference, file and sanitization tests |
 | **B3** export fixtures | S16 and S17 generated; the equivalence test | S16 ≡ S01; S17 matches its oracle. **Checkpoint B** |
 | **C1** client | `qb_client.py` | the client tests under the mock transport |
-| **C2** capture | `qb_capture.py` and the `capture-quickbase` command | capture tests: a mock app built from the S01 records, normalized and assessed, gives S01's identities. **Checkpoint C-mock** |
+| **C2** capture | `qb_capture.py` and the `capture-quickbase` command | capture tests: a mock app built from the S01 records, captured, normalized and assessed, gives S01's `(key, outcome, reason)` for every finding and READY_FOR_REVIEW. The `evaluation_id` differs, because the declared coverage basis differs (D-005). **Checkpoint C-mock** |
 | **C3** live verification *(operator-gated)* | run against an authorized test app (Appendix D); keep sanitized responses as fixtures; reconcile §12.1 with reality; update `docs/limitations.md` with the date and configuration | replaying the recorded responses reproduces the normalized snapshot. **Checkpoint C** |
 | **D1** publication *(operator-gated)* | make the repository public; publish `demo --all` as a static site | the site serves the engine's own outputs; no credentials anywhere |
 | **R** review | audit the code against §3 and §15.2; list every gap with file and line; fix them; record the audit in `docs/status.md` | no open gap |
