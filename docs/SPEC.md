@@ -2271,4 +2271,14 @@ A third reviewer read every engine module against §7, §8 and §22 and reproduc
   - §7.5.7: a `MULTIPLE_CURRENT_REVISIONS` entity unions its current rows.
   - §8.4: a malformed row's `raw_cells` keeps file order.
 
+---
+
+### 22.12 Amendment AM-6: Appendix D import files (decision D-011)
+
+Found while preparing C3. The import files written by `--quickbase-import` could not have built the test app:
+
+- **References.** A new, empty table numbers its records 1, 2, … in import order. Each reference column therefore holds the parent's 1-based row position in the parent's import file. Before, it held the record IDs of the synthetic S16 export (101 and up), which do not exist in a fresh table.
+- **Decided By.** `approvals.csv` includes `Decided By`, because `decided_by` is required (§5.5). A User field accepts only users of the realm, so `--decided-by EMAIL` sets the value; the default is the synthetic reviewer.
+- **The procedure.** `docs/c3-runbook.md` turns Appendix D into commands. Its check is that the live assessment adds, removes and changes no finding's outcome or reason. `compare` still reports differences in `observed`, because the coverage basis legitimately differs (D-005).
+
 *End of specification v3.0.*

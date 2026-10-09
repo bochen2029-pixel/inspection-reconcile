@@ -6,7 +6,8 @@ evidence-set digest implementation, so approval digests in the fixtures are not 
 Usage:
     python tools/make_fixtures.py                    regenerate fixtures/scenarios
     python tools/make_fixtures.py --check            regenerate into a temporary directory and compare bytes
-    python tools/make_fixtures.py --quickbase-import DIR   write S01 import CSVs for a Quickbase test app (Appendix D)
+    python tools/make_fixtures.py --quickbase-import DIR [--decided-by EMAIL]
+                                                     write S01 import CSVs for a fresh Quickbase test app (Appendix D)
 """
 
 from __future__ import annotations
@@ -857,9 +858,18 @@ def check() -> int:
     return 1 if problems else 0
 
 
-def quickbase_import(dest: Path) -> None:
+def quickbase_import(dest: Path, decided_by: str | None = None) -> None:
+    """Import CSVs for a fresh Quickbase test app (SPEC Appendix D).
+
+    A new, empty table numbers its records 1, 2, … in import order, so each reference column holds the parent's
+    1-based row position in the parent's own CSV (not the 101+/201+ record ids of the synthetic S16 export).
+    A User field accepts only users of the realm: ``decided_by`` replaces the synthetic reviewer address.
+    """
     snap = baseline("S01-clean")
     dest.mkdir(parents=True, exist_ok=True)
+    obligation_rid = {r["obligation_id"]: n for n, r in enumerate(snap.tables["scope"], start=1)}
+    inspection_rid = {r["inspection_id"]: n for n, r in enumerate(snap.tables["inspections"], start=1)}
+    assert len(inspection_rid) == len(snap.tables["inspections"]), "S01 has one row per inspection"
     sheets = {
         "obligations.csv": (
             ["Obligation ID", "Project ID", "Scope Revision", "Asset ID", "Activity"],
@@ -891,7 +901,7 @@ def quickbase_import(dest: Path) -> None:
                     r["inspection_id"],
                     r["revision"],
                     "Yes",
-                    str(int(r["obligation_id"][2:])),
+                    str(obligation_rid[r["obligation_id"]]),
                     r["project_id"],
                     r["asset_id"],
                     LABELS[r["activity_kind"]],
@@ -916,7 +926,7 @@ def quickbase_import(dest: Path) -> None:
                     r["artifact_id"],
                     r["revision"],
                     "Yes",
-                    str(100 + int(r["inspection_id"][4:])),
+                    str(inspection_rid[r["inspection_id"]]),
                     r["project_id"],
                     r["asset_id"],
                     LABELS[r["document_kind"]],
@@ -932,15 +942,17 @@ def quickbase_import(dest: Path) -> None:
                 "Evidence Digest",
                 "Decision",
                 "Decided At",
+                "Decided By",
             ],
             [
                 [
                     r["approval_id"],
-                    str(100 + int(r["inspection_id"][4:])),
+                    str(inspection_rid[r["inspection_id"]]),
                     r["inspection_revision"],
                     r["evidence_digest"],
                     LABELS[r["decision"]],
                     r["decided_at"],
+                    decided_by or r["decided_by"],
                 ]
                 for r in snap.tables["approvals"]
             ],
@@ -967,12 +979,19 @@ def main(argv: list[str] | None = None) -> int:
         "--check", action="store_true", help="compare a fresh generation with the committed fixtures"
     )
     parser.add_argument("--quickbase-import", metavar="DIR", help="write Quickbase import CSVs for S01")
+    parser.add_argument(
+        "--decided-by",
+        metavar="EMAIL",
+        help="with --quickbase-import: the realm user written to Decided By (default: the synthetic reviewer)",
+    )
     args = parser.parse_args(argv)
     if args.check:
         return check()
     if args.quickbase_import:
-        quickbase_import(Path(args.quickbase_import))
+        quickbase_import(Path(args.quickbase_import), args.decided_by)
         return 0
+    if args.decided_by:
+        parser.error("--decided-by needs --quickbase-import")
     files = generate()
     with tempfile.TemporaryDirectory(dir=REPO / "fixtures") as tmp:
         staging = Path(tmp) / "scenarios"

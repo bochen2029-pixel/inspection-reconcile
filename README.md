@@ -147,7 +147,8 @@ Copy [docs/qb-capture.example.yml](docs/qb-capture.example.yml) to start a captu
 
 **Status:** tested against a mock Quickbase app that follows the published OpenAPI contract. A capture of that mock
 app gives the same finding for every requirement as the canonical scenario. The capture has **not yet run against
-a live Quickbase app**; [Appendix D of the spec](docs/SPEC.md) describes a test-app blueprint for that step.
+a live Quickbase app**. [docs/c3-runbook.md](docs/c3-runbook.md) walks through that step with a test app built
+from Appendix D of the spec.
 
 ## How it is tested
 

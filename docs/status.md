@@ -16,7 +16,7 @@ Step plan: SPEC §16.3. Each step ends green (`pytest`, `ruff check`, `ruff form
 | B3 export fixtures | done | S16 normalized equals S01 in `evaluation_id` and `assessment_semantic_sha256` (AC-14); S17 matches its oracle; P2 covers the export. **Checkpoint B** |
 | C1 client | done | helper task T2: four-operation allowlist, rate limit, 429/Retry-After, base64 download, redaction |
 | C2 capture | done | helper task T3: keyset reads, two-pass check, coverage declarations, files policy; AM-4. **Checkpoint C-mock** (D-005) |
-| C3 live verification | operator-gated | needs a Quickbase account, a test app and a user token; start from `docs/qb-capture.example.yml` |
+| C3 live verification | operator-gated | needs a Quickbase account, a test app and a user token; follow `docs/c3-runbook.md` |
 | D1 publication | operator-gated | the repository is private; publication is the owner's decision |
 | R review | in progress | the invariant and AC audit below is done; independent reviews: oracle (D-003) and engine (D-009) applied, adapters pending |
 

@@ -91,3 +91,13 @@ built as specified in the AM-4 addendum (helper task T3b, reviewed):
 - **The manifest** records the mode in an optional `tables[].paging` member.
 
 C3 confirms which mode a real realm needs.
+
+## D-011 · 2026-10-09 · Amendment AM-6: Appendix D import files (SPEC Appendix D, §22.12)
+Preparing C3 showed that the generated import files would not have built a working test app:
+- **References.** Artifacts and approvals pointed at inspection record IDs 101 and up, which a fresh table does
+  not have. Every reference is now the parent's 1-based import position.
+- **Decided By.** The approvals file lacked the required `Decided By`, so every live approval would have been
+  quarantined. It is now included, with `--decided-by` for a realm user.
+
+A test checks that every reference column resolves to the parent named by S01's canonical snapshot.
+`docs/c3-runbook.md` gives the procedure. The fixtures are unchanged (`--check`: 0 problems).
