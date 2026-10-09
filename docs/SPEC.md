@@ -2431,6 +2431,6 @@ The tool's tests build against a fake realm that enforces the OpenAPI request sh
 
 One question only a live realm can answer: the builder creates Date/Time fields as `timestamp`, which the OpenAPI enum allows and §12.3 expects, while the API portal's example uses `datetime`. If a realm refuses `timestamp` or reports another type, the build stops at that field, before any record exists, and says why.
 
-The same review found one defect in the package. `capture-quickbase` echoed `token_env` in `QB_TOKEN_MISSING` and in its validation error, so a token pasted there in place of a variable's name was printed. A user token is lower case. A `token_env` value is now shown only when it is an upper-case name, and a validation error never shows it (I-7).
+An independent review of the builder also found one defect in the package. `capture-quickbase` echoed `token_env` in `QB_TOKEN_MISSING` and in its validation error, so a token pasted there in place of a variable's name was printed. A user token is lower case. A `token_env` value is now shown only when it is an upper-case name, and a validation error never shows it (I-7).
 
 *End of specification v3.0.*
