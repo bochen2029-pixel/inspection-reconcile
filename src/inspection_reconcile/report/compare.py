@@ -1,0 +1,54 @@
+"""comparison.json (SPEC §9.5): findings matched by key."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from inspection_reconcile.errors import RunError
+
+COMPARISON_SCHEMA = "inspection-reconcile/comparison/v1"
+COMPARED = ("outcome", "reason", "expected", "observed", "blocked_by", "caused_by", "required")
+
+
+def load_assessment(path: Path) -> dict[str, Any]:
+    target = path / "assessment.json" if path.is_dir() else path
+    try:
+        doc = json.loads(target.read_bytes().decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RunError("COMPARE_INPUT_INVALID", f"{target}: {exc}") from exc
+    if not isinstance(doc, dict) or doc.get("schema") != "inspection-reconcile/assessment/v1":
+        raise RunError("COMPARE_INPUT_INVALID", f"{target}: not an inspection-reconcile assessment")
+    return doc
+
+
+def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    b = {f["key"]: f for f in before["findings"]}
+    a = {f["key"]: f for f in after["findings"]}
+    changed = []
+    unchanged = 0
+    for key in sorted(set(b) & set(a)):
+        if any(b[key][field] != a[key][field] for field in COMPARED):
+            changed.append(
+                {
+                    "key": key,
+                    "before": {"outcome": b[key]["outcome"], "reason": b[key]["reason"]},
+                    "after": {"outcome": a[key]["outcome"], "reason": a[key]["reason"]},
+                }
+            )
+        else:
+            unchanged += 1
+    return {
+        "schema": COMPARISON_SCHEMA,
+        "before": {"evaluation_id": before["evaluation_id"], "status": before["status"]},
+        "after": {"evaluation_id": after["evaluation_id"], "status": after["status"]},
+        "added": sorted(set(a) - set(b)),
+        "removed": sorted(set(b) - set(a)),
+        "changed": changed,
+        "unchanged_count": unchanged,
+    }
+
+
+def has_differences(comparison: dict[str, Any]) -> bool:
+    return bool(comparison["added"] or comparison["removed"] or comparison["changed"])

@@ -34,3 +34,15 @@ that inspection. Those findings would also downgrade the inspections dataset wit
 the referenced entity is present. Entity references (`inspection_id`) now resolve to any row whose
 `inspection_id` cell is readable. Item references to `(artifact_id, artifact_revision)` still need the exact
 key. No oracle scenario is affected.
+
+## D-005 · 2026-10-09 · Clarified definition of done for C2 (SPEC §16.3)
+A live (or mock) capture declares coverage with the bases `[query_total_matched, two_pass_stable,
+operator_attestation]`, while S01 declares `[synthetic_universe]`. Declared coverage is part of the snapshot
+semantic digest (§8.4), so `evaluation_id` legitimately differs. The C2 check is therefore: a capture of a mock
+app built from the S01 records, normalized and assessed, gives the same `(key, outcome, reason)` for every
+finding as S01, and the status READY_FOR_REVIEW. Exact identity equality remains the B3 test (S16 ≡ S01).
+
+## D-006 · 2026-10-09 · Parallel work by helper sessions
+Two other Claude Code sessions of the same operator work on claimed, file-scoped tasks in separate git worktrees
+(T2: the HTTP client; T3: mapping, normalize and capture; T4: SQL export). The main session reviews and merges
+each branch. The helpers also re-derived the oracle independently (T1, D-003).

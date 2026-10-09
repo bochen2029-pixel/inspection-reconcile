@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ project.name }}: {{ status }} | inspection-reconcile</title>
+<style>
+:root { --fg: #1d2330; --muted: #5b6475; --bg: #ffffff; --panel: #f4f6f9; --line: #d9dee7;
+  --pass: #1f7a3f; --fail: #b3261e; --unk: #8a5a00; --ne: #5b6475; --banner: #fff4d6; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #e7eaf0; --muted: #a2abbd; --bg: #12151c; --panel: #1b2029; --line: #2e3542;
+    --pass: #6fcf8f; --fail: #ff8a80; --unk: #ffc857; --ne: #a2abbd; --banner: #3a3115; } }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9em; }
+.banner { background: var(--banner); border: 1px solid var(--line); padding: 8px 12px; border-radius: 6px;
+  font-weight: 600; margin-bottom: 16px; }
+.meta { color: var(--muted); }
+.status { display: inline-block; font-weight: 700; padding: 2px 10px; border-radius: 4px; border: 2px solid; }
+.s-READY_FOR_REVIEW, .o-PASS { color: var(--pass); }
+.s-BLOCKED, .o-FAIL { color: var(--fail); }
+.s-UNKNOWN, .o-UNKNOWN { color: var(--unk); }
+.o-NOT_EVALUATED { color: var(--ne); }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+th { background: var(--panel); }
+.scroll { overflow-x: auto; }
+details { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; padding: 6px 10px; background: var(--panel); }
+summary { cursor: pointer; font-weight: 600; }
+.grid td { text-align: center; font-weight: 600; font-size: 0.85em; }
+.grid td.oid { text-align: left; font-weight: 400; }
+ul.counts { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+@media print { details { break-inside: avoid; } details:not([open]) > *:not(summary) { display: none; } }
+</style>
+</head>
+<body>
+<main>
+{% if synthetic %}<div class="banner">SYNTHETIC DATA: fictional project</div>
+{% endif %}
+<h1>{{ project.name }} <span class="meta">({{ project.project_id }})</span></h1>
+<p><span class="status s-{{ status }}">{{ status }}</span></p>
+<p class="meta">as of <code>{{ as_of }}</code> · snapshot <code>{{ snapshot_id }}</code> · scope revision <code>{{ scope_revision }}</code> · pack <code>{{ pack_id }}</code> {{ pack_version }} · evaluation <code title="{{ evaluation_id }}">{{ evaluation_short }}</code></p>
+
+<h2>What this result means</h2>
+<ul>
+<li><strong>READY_FOR_REVIEW</strong>: every required check passed for the accepted scope and the captured snapshot. It is not approval, and not a judgment of physical inspection quality or compliance.</li>
+<li><strong>BLOCKED</strong>: at least one established defect (FAIL).</li>
+<li><strong>UNKNOWN</strong>: no established defect, but the captured data cannot decide (UNKNOWN or NOT_EVALUATED). Absence from a partial view is not absence.</li>
+</ul>
+
+<h2>Coverage</h2>
+<div class="scroll"><table>
+<tr><th>dataset</th><th>declared</th><th>effective</th><th>basis</th><th>reasons</th></tr>
+{% for row in coverage %}<tr><td>{{ row.dataset }}</td><td>{{ row.declared }}</td><td>{{ row.effective }}</td><td>{{ row.basis }}</td><td>{{ row.reasons }}</td></tr>
+{% endfor %}</table></div>
+
+<h2>Summary</h2>
+<ul class="counts">
+<li>root failures: <strong>{{ summary.root_fail }}</strong></li>
+<li>root unknowns: <strong>{{ summary.root_unknown }}</strong></li>
+<li>dependent unknowns: <strong>{{ summary.dependent_unknown }}</strong></li>
+<li>not evaluated: <strong>{{ summary.not_evaluated }}</strong></li>
+<li>advisory (non-pass): <strong>{{ summary.advisory }}</strong></li>
+<li>findings: <strong>{{ summary.total }}</strong> ({{ summary.passed }} pass)</li>
+</ul>
+
+<h2>Root findings</h2>
+{% if roots %}{% for f in roots %}<details{% if loop.index <= 3 %} open{% endif %}>
+<summary><span class="o-{{ f.outcome }}">{{ f.outcome }}</span> · <code>{{ f.key }}</code> · {{ f.reason }}{% if f.blocks %} · blocks {{ f.blocks }}{% endif %}</summary>
+<p>{{ f.explanation }}</p>
+<div class="scroll"><table>
+<tr><th>field</th><th>expected</th><th>observed</th></tr>
+{% for r in f.value_rows %}<tr><td><code>{{ r.name }}</code></td><td><pre>{{ r.expected }}</pre></td><td><pre>{{ r.observed }}</pre></td></tr>
+{% endfor %}</table></div>
+<p><strong>Resolution:</strong> {{ f.resolution }}</p>
+{% if f.evidence %}<p class="meta">Evidence: {% for e in f.evidence %}<code>{{ e }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}</details>
+{% endfor %}{% else %}<p>No root findings.</p>
+{% endif %}
+
+<h2>Obligations</h2>
+<div class="scroll"><table class="grid">
+<tr><th>obligation</th><th>R2 cardinality</th><th>R3 identity</th><th>R4 artifacts</th><th>R5 files</th><th>R6 approval</th></tr>
+{% for row in grid %}<tr><td class="oid"><code>{{ row.obligation }}</code></td>{% for c in row.cells %}<td class="o-{{ c.outcome }}" title="{{ c.reason }}">{{ c.label }}</td>{% endfor %}</tr>
+{% endfor %}</table></div>
+
+<h2>All findings</h2>
+<div class="scroll"><table>
+<tr><th>key</th><th>outcome</th><th>reason</th><th>required</th></tr>
+{% for f in findings %}<tr><td><code>{{ f.key }}</code></td><td class="o-{{ f.outcome }}">{{ f.outcome }}</td><td>{{ f.reason }}</td><td>{{ f.required }}</td></tr>
+{% endfor %}</table></div>
+
+<h2>Provenance</h2>
+<div class="scroll"><table>
+<tr><th>evaluation_id</th><td><code>{{ evaluation_id }}</code></td></tr>
+<tr><th>provenance_id</th><td><code>{{ provenance_id }}</code></td></tr>
+<tr><th>snapshot semantic</th><td><code>{{ snapshot_semantic }}</code></td></tr>
+<tr><th>assessment semantic</th><td><code>{{ assessment_semantic }}</code></td></tr>
+<tr><th>policy</th><td><code>{{ policy_sha }}</code></td></tr>
+{% for i in inputs %}<tr><th>input: {{ i.role }}</th><td><code>{{ i.sha256 }}</code></td></tr>
+{% endfor %}</table></div>
+<p class="meta">Generated by inspection-reconcile {{ engine_version }}. Quickbase is a trademark of Quickbase, Inc.; this project is not affiliated with or endorsed by Quickbase.</p>
+</main>
+</body>
+</html>

@@ -31,12 +31,12 @@ def prepare_out(out: Path, force: bool, own_dirs: Iterable[str] = ()) -> None:
     if not out.exists():
         return
     if not out.is_dir():
-        raise RunError("OUT_INVALID", f"{out}: exists and is not a directory")
+        raise RunError("OUT_INVALID", f"{out.as_posix()}: exists and is not a directory")
     entries = list(out.iterdir())
     if not entries:
         return
     if not force:
-        raise RunError("OUT_NOT_EMPTY", f"{out}: exists and is not empty (use --force)")
+        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: exists and is not empty (use --force)")
     for name in KNOWN_OUTPUTS:
         target = out / name
         if target.is_file():
@@ -69,5 +69,5 @@ def write_files(out: Path, files: Mapping[str, bytes]) -> list[Path]:
             tmp.unlink(missing_ok=True)
         for path in written:
             path.unlink(missing_ok=True)
-        raise RunError("WRITE_FAILED", f"{out}: {exc.strerror or exc}") from exc
+        raise RunError("WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}") from exc
     return written
