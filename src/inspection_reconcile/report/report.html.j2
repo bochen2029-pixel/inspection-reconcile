@@ -49,10 +49,11 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
 
 <h2>What this result means</h2>
 <ul>
-<li><strong>READY_FOR_REVIEW</strong>: every required check passed for the accepted scope and the captured snapshot. It is not approval, and not a judgment of physical inspection quality or compliance.</li>
+<li><strong>READY_FOR_REVIEW</strong>: every required check passed for the accepted scope and the captured snapshot.</li>
 <li><strong>BLOCKED</strong>: at least one established defect (FAIL).</li>
 <li><strong>UNKNOWN</strong>: no established defect, but the captured data cannot decide (UNKNOWN or NOT_EVALUATED). Absence from a partial view is not absence.</li>
 </ul>
+<p><strong>READY_FOR_REVIEW is not approval</strong>, and it is not a judgment of physical inspection quality or compliance.</p>
 
 <h2>Coverage</h2>
 <div class="scroll"><table>
@@ -72,7 +73,7 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
 
 <h2>Root findings</h2>
 {% if roots %}{% for f in roots %}<details{% if loop.index <= 3 %} open{% endif %}>
-<summary><span class="o-{{ f.outcome }}">{{ f.outcome }}</span> · <code>{{ f.key }}</code> · {{ f.reason }}{% if f.blocks %} · blocks {{ f.blocks }}{% endif %}</summary>
+<summary><span class="o-{{ f.outcome }}">{{ f.outcome }}</span> · <code>{{ f.key }}</code> · {{ f.reason }} · blocks {{ f.blocks }}</summary>
 <p>{{ f.explanation }}</p>
 <div class="scroll"><table>
 <tr><th>field</th><th>expected</th><th>observed</th></tr>

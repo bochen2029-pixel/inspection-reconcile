@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from collections.abc import Iterable, Mapping
+import tempfile
+from collections.abc import Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,21 @@ KNOWN_OUTPUTS = (
     "index.html",
     "evaluation_ids.json",
 )
+# The output names of the commands whose --out must hold nothing else (SPEC §9.6).
+NORMALIZE_OUTPUTS = (
+    "manifest.json",
+    "project.json",
+    "scope.csv",
+    "inspections.csv",
+    "artifacts.csv",
+    "approvals.csv",
+    "approval_items.csv",
+    "normalization.json",
+)
+NORMALIZE_DIRS = ("evidence",)
+CAPTURE_OUTPUTS = ("capture-manifest.json",)
+CAPTURE_DIRS = ("tables", "files")
+STAGING_PREFIX = ".staging-"
 
 
 def json_bytes(value: Any) -> bytes:
@@ -45,6 +62,70 @@ def prepare_out(out: Path, force: bool, own_dirs: Iterable[str] = ()) -> None:
         target = out / name
         if target.is_dir() and not target.is_symlink():
             shutil.rmtree(target)
+
+
+@contextmanager
+def replacing_out(
+    out: Path, force: bool, own_files: Iterable[str], own_dirs: Iterable[str]
+) -> Iterator[Path]:
+    """--out for ``normalize`` and ``capture-quickbase``: yield the empty directory to write into.
+
+    Without --force, --out must be absent or empty. With --force it may hold only this command's own output names,
+    checked before anything is touched. The new output is then written into a staging directory inside --out and
+    replaces the previous one only when the command succeeds, so a refused or failed run leaves --out as it was.
+    """
+    previous = _replaceable(out, force, set(own_files), set(own_dirs))
+    if not previous:
+        yield out
+        return
+    stage = Path(tempfile.mkdtemp(prefix=STAGING_PREFIX, dir=out))
+    try:
+        yield stage
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
+    try:
+        for entry in previous:
+            if entry.is_dir():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
+        for entry in sorted(stage.iterdir()):
+            os.replace(entry, out / entry.name)
+        stage.rmdir()
+    except OSError as exc:
+        raise RunError("WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}") from exc
+
+
+def _replaceable(out: Path, force: bool, files: set[str], dirs: set[str]) -> list[Path]:
+    """The previous output that --force may replace. Anything else in --out refuses the run."""
+    if not out.exists():
+        return []
+    if not out.is_dir():
+        raise RunError("OUT_INVALID", f"{out.as_posix()}: exists and is not a directory")
+    entries = sorted(out.iterdir())
+    if not entries:
+        return []
+    if not force:
+        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: exists and is not empty (use --force)")
+    foreign = [e.name for e in entries if not _owned(e, files, dirs)]
+    if foreign:
+        shown = ", ".join(foreign[:5]) + (f" (and {len(foreign) - 5} more)" if len(foreign) > 5 else "")
+        raise RunError(
+            "OUT_NOT_EMPTY",
+            f"{out.as_posix()}: --force replaces only this command's own previous output, and it also holds {shown}",
+        )
+    return entries
+
+
+def _owned(entry: Path, files: set[str], dirs: set[str]) -> bool:
+    if entry.is_symlink() or entry.is_junction():  # never followed, never deleted
+        return False
+    if entry.name.startswith(STAGING_PREFIX):  # left behind by an interrupted run
+        return entry.is_dir()
+    if entry.name in files:
+        return entry.is_file()
+    return entry.name in dirs and entry.is_dir()
 
 
 def write_files(out: Path, files: Mapping[str, bytes]) -> list[Path]:

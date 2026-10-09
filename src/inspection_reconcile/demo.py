@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,8 @@ from inspection_reconcile.runner import Evaluation, evaluate, normalized_export
 from inspection_reconcile.vocab import EXIT_DEMO_MISMATCH, EXIT_OK, STATUS_EXIT
 
 COMPARISON_DIR = "compare-S02-S06"
+# An export scenario's normalized snapshot goes into <out>/<scenario>/snapshot (SPEC §11).
+SNAPSHOT_DIR = "snapshot"
 
 INDEX_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -46,7 +48,7 @@ code { font-family: ui-monospace, Consolas, monospace; }
 <p>Each scenario was assessed by the engine and checked against the hand-written oracle in <code>fixtures/oracle.yaml</code>.</p>
 <table>
 <tr><th>scenario</th><th>oracle status</th><th>actual status</th><th>matches oracle</th><th>report</th></tr>
-{% for r in rows %}<tr><td><code>{{ r.id }}</code></td><td>{{ r.expected }}</td><td>{{ r.actual }}</td><td class="{{ 'ok' if r.match else 'bad' }}">{{ 'yes' if r.match else 'NO' }}</td><td><a href="{{ r.id }}/report.html">report</a></td></tr>
+{% for r in rows %}<tr><td><code>{{ r.id }}</code></td><td>{{ r.expected }}</td><td>{{ r.actual }}</td><td class="{{ 'ok' if r.match else 'bad' }}">{{ 'yes' if r.match else 'NO' }}</td><td>{% if r.report %}<a href="{{ r.id }}/report.html">report</a>{% else %}none (run error){% endif %}</td></tr>
 {% endfor %}</table>
 {% if comparison %}<h2>The corrected rerun: S02 → S06</h2>
 <p>Status {{ comparison.before.status }} → {{ comparison.after.status }}; {{ comparison.changed|length }} finding(s) changed, {{ comparison.unchanged_count }} unchanged.</p>
@@ -63,6 +65,7 @@ class ScenarioResult:
     scenario_id: str
     evaluation: Evaluation | None
     problems: list[str]
+    snapshot: dict[str, bytes] = field(default_factory=dict)
 
     @property
     def matched(self) -> bool:
@@ -73,16 +76,26 @@ class ScenarioResult:
         return self.evaluation.assessment.status if self.evaluation is not None else "RUN_ERROR"
 
 
-def _evaluate(repo: Path, fixtures: Path, scenario_id: str, spec: dict[str, Any]) -> Evaluation:
+def _evaluate(
+    repo: Path, fixtures: Path, scenario_id: str, spec: dict[str, Any], home: Path
+) -> tuple[Evaluation, dict[str, bytes]]:
+    """Assess one scenario. An export scenario is normalized first (SPEC §11); its snapshot is returned as bytes,
+    to be written under ``home`` (``<out>/<scenario>/snapshot``) with the other outputs, and the run manifest
+    records the inputs at those final paths."""
     fixture_dir = fixtures / spec.get("fixture", scenario_id)
     policy = repo / "policies" / f"{spec.get('policy', 'north-creek-demo')}.yml"
-    if (fixture_dir / "export").is_dir():
-        with normalized_export(fixture_dir / "export", repo / "mappings" / "quickbase-demo.yml") as (
-            snap,
-            info,
-        ):
-            return evaluate(snap, policy, mapping=info)
-    return evaluate(fixture_dir / "snapshot", policy)
+    if not (fixture_dir / "export").is_dir():
+        return evaluate(fixture_dir / "snapshot", policy), {}
+    with normalized_export(fixture_dir / "export", repo / "mappings" / "quickbase-demo.yml") as (snap, info):
+        evaluation = evaluate(snap, policy, mapping=info)
+        files = {
+            p.relative_to(snap).as_posix(): p.read_bytes() for p in sorted(snap.rglob("*")) if p.is_file()
+        }
+        inputs = [
+            (role, home / path.relative_to(snap) if path.is_relative_to(snap) else path, size, sha)
+            for role, path, size, sha in evaluation.inputs
+        ]
+    return replace(evaluation, inputs=inputs), files
 
 
 def run_demo(
@@ -105,16 +118,16 @@ def run_demo(
         prepare_out(out, force=False)  # refuse a non-empty --out before any work
 
     results: dict[str, ScenarioResult] = {}
-    cache: dict[str, Evaluation] = {}
+    cache: dict[str, tuple[Evaluation, dict[str, bytes]]] = {}
 
-    def run(sid: str) -> Evaluation:
+    def run(sid: str) -> tuple[Evaluation, dict[str, bytes]]:
         if sid not in cache:
-            cache[sid] = _evaluate(repo, fixtures, sid, scenarios[sid])
+            cache[sid] = _evaluate(repo, fixtures, sid, scenarios[sid], out / sid / SNAPSHOT_DIR)
         return cache[sid]
 
     for sid in ids:
         try:
-            evaluation = run(sid)
+            evaluation, snapshot = run(sid)
         except RunError as exc:  # one scenario's run error is a mismatch, not the end of the demo
             results[sid] = ScenarioResult(sid, None, [f"run error {exc.code}: {exc.message}"])
             continue
@@ -122,7 +135,7 @@ def run_demo(
         twin = scenarios[sid].get("equivalent_to")
         if twin:
             try:
-                b = run(twin).assessment
+                b = run(twin)[0].assessment
                 a = evaluation.assessment
                 if (a.evaluation_id, a.assessment_semantic_sha256) != (
                     b.evaluation_id,
@@ -131,7 +144,7 @@ def run_demo(
                     problems.append(f"not equivalent to {twin}")
             except RunError as exc:
                 problems.append(f"{twin} could not run: {exc.code}")
-        results[sid] = ScenarioResult(sid, evaluation, problems)
+        results[sid] = ScenarioResult(sid, evaluation, problems, snapshot)
 
     files: dict[str, bytes] = {}
     ids_doc: dict[str, Any] = {}
@@ -139,6 +152,8 @@ def run_demo(
         if result.evaluation is None:
             ids_doc[sid] = {"status": "RUN_ERROR", "matches_oracle": False}
             continue
+        for name, data in result.snapshot.items():
+            files[f"{sid}/{SNAPSHOT_DIR}/{name}"] = data
         outputs = result.evaluation.outputs()
         for name, data in outputs.items():
             files[f"{sid}/{name}"] = data
@@ -167,6 +182,7 @@ def run_demo(
                 "expected": scenarios[sid]["status"],
                 "actual": r.status,
                 "match": r.matched,
+                "report": r.evaluation is not None,
             }
             for sid, r in results.items()
         ]

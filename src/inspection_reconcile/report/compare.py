@@ -17,10 +17,36 @@ def load_assessment(path: Path) -> dict[str, Any]:
     try:
         doc = json.loads(target.read_bytes().decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RunError("COMPARE_INPUT_INVALID", f"{target}: {exc}") from exc
+        raise RunError("COMPARE_INPUT_INVALID", f"{target.as_posix()}: {exc}") from exc
     if not isinstance(doc, dict) or doc.get("schema") != "inspection-reconcile/assessment/v1":
-        raise RunError("COMPARE_INPUT_INVALID", f"{target}: not an inspection-reconcile assessment")
+        raise RunError(
+            "COMPARE_INPUT_INVALID", f"{target.as_posix()}: not an inspection-reconcile assessment"
+        )
+    problem = _shape_problem(doc)
+    if problem:
+        raise RunError("COMPARE_INPUT_INVALID", f"{target.as_posix()}: {problem}")
     return doc
+
+
+def _shape_problem(doc: dict[str, Any]) -> str | None:
+    """The first member compare() needs that is missing or of the wrong type (SPEC §9.1, §9.2)."""
+    for member in ("evaluation_id", "status"):
+        if not isinstance(doc.get(member), str):
+            return f"{member} is missing or not a string"
+    findings = doc.get("findings")
+    if not isinstance(findings, list):
+        return "findings is missing or not a list"
+    keys = set()
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict) or not isinstance(finding.get("key"), str):
+            return f"findings[{index}] has no key"
+        missing = [field for field in COMPARED if field not in finding]
+        if missing:
+            return f"finding {finding['key']} lacks {', '.join(missing)}"
+        if finding["key"] in keys:
+            return f"finding {finding['key']} appears twice"
+        keys.add(finding["key"])
+    return None
 
 
 def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

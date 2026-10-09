@@ -14,7 +14,16 @@ from pathlib import Path
 from inspection_reconcile import __version__
 from inspection_reconcile.errors import RunError
 from inspection_reconcile.grammar import parse_ts
-from inspection_reconcile.io.writer import json_bytes, prepare_out, write_files
+from inspection_reconcile.io.writer import (
+    CAPTURE_DIRS,
+    CAPTURE_OUTPUTS,
+    NORMALIZE_DIRS,
+    NORMALIZE_OUTPUTS,
+    json_bytes,
+    prepare_out,
+    replacing_out,
+    write_files,
+)
 from inspection_reconcile.vocab import (
     EXIT_COMPARE_DIFF,
     EXIT_OK,
@@ -42,6 +51,21 @@ def diag(level: str, code: str, message: str) -> None:
         )
     else:
         sys.stderr.write(f"{level}: {code}: {message}\n")
+
+
+class JsonLogFormatter(logging.Formatter):
+    """--log-json for library log records: the members diag() writes, plus the logger's name (SPEC §11)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "level": record.levelname.lower(),
+                "code": "LOG",
+                "logger": record.name,
+                "message": record.getMessage(),
+            },
+            ensure_ascii=False,
+        )
 
 
 def _as_of(text: str | None) -> datetime | None:
@@ -104,11 +128,10 @@ def cmd_normalize(args: argparse.Namespace) -> int:
         from inspection_reconcile.adapters.qb_export import normalize
     except ImportError as exc:  # pragma: no cover - present once step B2 is merged
         raise RunError("NOT_AVAILABLE", f"the Quickbase export adapter is not installed: {exc}") from exc
+    mapping = load_mapping(Path(args.mapping))
     out = Path(args.out)
-    prepare_out(out, args.force, own_dirs=())
-    if out.exists() and any(out.iterdir()):
-        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: normalize needs an absent or empty directory")
-    normalize(Path(args.export), load_mapping(Path(args.mapping)), out)
+    with replacing_out(out, args.force, NORMALIZE_OUTPUTS, NORMALIZE_DIRS) as target:
+        normalize(Path(args.export), mapping, target)
     print(f"normalized snapshot written to {out.as_posix()}")
     return EXIT_OK
 
@@ -172,14 +195,12 @@ def cmd_capture(args: argparse.Namespace) -> int:
     config = load_capture_config(Path(args.config))
     mapping = load_mapping(Path(args.mapping))
     out = Path(args.out)
-    prepare_out(out, args.force)
-    if out.exists() and any(out.iterdir()):
-        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: capture needs an absent or empty directory")
-    client = make_client(config, user_agent=f"inspection-reconcile/{__version__}")  # QB_TOKEN_MISSING
-    try:
-        capture(client, config, mapping, out, now=lambda: datetime.now(UTC))
-    finally:
-        client.close()
+    with replacing_out(out, args.force, CAPTURE_OUTPUTS, CAPTURE_DIRS) as target:
+        client = make_client(config, user_agent=f"inspection-reconcile/{__version__}")  # QB_TOKEN_MISSING
+        try:
+            capture(client, config, mapping, target, now=lambda: datetime.now(UTC))
+        finally:
+            client.close()
     print(f"capture written to {out.as_posix()}")
     return EXIT_OK
 
@@ -266,9 +287,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:  # argparse usage errors exit 2; --help and --version exit 0
         return int(exc.code) if isinstance(exc.code, int) else EXIT_RUN_ERROR
     LOG_JSON = bool(args.log_json)
-    logging.basicConfig(
-        level=logging.WARNING, stream=sys.stderr, format="%(levelname)s: %(name)s: %(message)s"
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(
+        JsonLogFormatter() if LOG_JSON else logging.Formatter("%(levelname)s: %(name)s: %(message)s")
     )
+    logging.basicConfig(level=logging.WARNING, handlers=[handler])
     if not getattr(args, "func", None):
         parser.print_help()
         return EXIT_RUN_ERROR
