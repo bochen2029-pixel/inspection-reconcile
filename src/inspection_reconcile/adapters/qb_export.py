@@ -117,6 +117,7 @@ def _table_entry(value: Any, where: str) -> dict[str, Any]:
             "retrieved": v.integer(0, 2**53 - 1),
             "two_pass": v.enum(TWO_PASS_VALUES),
         },
+        {"paging": v.enum(("keyset", "skip"))},
     )
 
 

@@ -183,6 +183,7 @@ def make_client(
 class TableRead:
     """The result of one keyset-paginated read of a table (SPEC §12.5 step 2)."""
 
+    paging: str = "keyset"
     pages: list[dict[str, Any]] = field(default_factory=list)
     total0: int | None = None
     retrieved: int = 0
@@ -204,68 +205,90 @@ def _int(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def read_table(
+class _KeysetRefused(Exception):
+    """The source rejected the ``{3.GT.n}`` comparison on a table's first page (an unverified fact, §12.1)."""
+
+
+def _check_page(
+    read: TableRead, page: dict[str, Any], select: list[int], label: str
+) -> tuple[int, list[Any], list[int]]:
+    """Checks shared by both paging modes: every selected field returned, integer metadata, record ids.
+    Returns the page's ``totalRecords``, its records and their Record ID#s."""
+    read.pages.append(page)
+    returned = {f.get("id") for f in page["fields"] if isinstance(f, dict)}
+    missing = [fid for fid in select if fid not in returned]
+    if missing:
+        raise RunError(
+            "FIELD_NOT_RETURNED",
+            f"{label}: the query did not return field(s) {missing}; check the token's permissions and the schema",
+        )
+    meta = page["metadata"]
+    total = _int(meta.get("totalRecords"))
+    num = _int(meta.get("numRecords"))
+    if total is None or num is None:
+        raise RunError("QB_PROTOCOL", f"{label}: metadata.totalRecords and numRecords must be integers")
+    if read.total0 is None:
+        read.total0 = total
+    data: list[Any] = page["data"]
+    if num != len(data):
+        read.accounting_ok = False
+    rids: list[int] = []
+    for record in data:
+        cell = record.get("3") if isinstance(record, dict) else None
+        rid = _int(cell.get("value")) if isinstance(cell, dict) else None
+        if rid is None:
+            raise RunError("QB_PROTOCOL", f"{label}: a record has no integer Record ID# (field 3)")
+        rids.append(rid)
+        modified = record.get("2")
+        read.modified[rid] = modified.get("value") if isinstance(modified, dict) else None
+    return total, data, rids
+
+
+def _ascending(rids: list[int], floor: int) -> bool:
+    return bool(rids) and rids[0] > floor and all(b > a for a, b in zip(rids, rids[1:], strict=False))
+
+
+def _read_keyset(
     client: QuickbaseClient,
     table: TableMap,
     select: list[int],
     base: str | None,
     page_size: int,
     max_pages: int,
+    allow_fallback: bool,
 ) -> TableRead:
-    """Read a whole table with keyset pagination on Record ID#, accounting for every page's total."""
     label = f"table {table.role} ({table.table_id})"
-    read = TableRead()
+    read = TableRead(paging="keyset")
     last = 0
-    for _ in range(max_pages):
+    for page_number in range(max_pages):
         where = (f"{base}AND" if base else "") + "{3.GT." + str(last) + "}"
-        page = client.run_query(
-            {
-                "from": table.table_id,
-                "select": select,
-                "where": where,
-                "sortBy": [{"fieldId": 3, "order": "ASC"}],
-                "options": {"skip": 0, "top": page_size},
-            }
-        )
-        read.pages.append(page)
-        returned = {f.get("id") for f in page["fields"] if isinstance(f, dict)}
-        missing = [fid for fid in select if fid not in returned]
-        if missing:
-            raise RunError(
-                "FIELD_NOT_RETURNED",
-                f"{label}: the query did not return field(s) {missing}; check the token's permissions and the schema",
-            )
-        meta = page["metadata"]
-        total = _int(meta.get("totalRecords"))
-        num = _int(meta.get("numRecords"))
-        if total is None or num is None:
-            raise RunError("QB_PROTOCOL", f"{label}: metadata.totalRecords and numRecords must be integers")
-        if read.total0 is None:
-            read.total0 = total
-        if total != read.total0 - read.retrieved:
+        body = {
+            "from": table.table_id,
+            "select": select,
+            "where": where,
+            "sortBy": [{"fieldId": 3, "order": "ASC"}],
+            "options": {"skip": 0, "top": page_size},
+        }
+        try:
+            page = client.run_query(body)
+        except RunError as exc:
+            refused = exc.code == "QB_HTTP_ERROR" and "HTTP 400" in exc.message
+            if refused and page_number == 0 and allow_fallback:
+                raise _KeysetRefused() from exc
+            raise
+        total, data, rids = _check_page(read, page, select, label)
+        if total != (read.total0 or 0) - read.retrieved:
             read.accounting_ok = False
             log.warning(
                 "%s: page total %d != %d expected; the table changed",
                 label,
                 total,
-                read.total0 - read.retrieved,
+                (read.total0 or 0) - read.retrieved,
             )
-        data = page["data"]
-        if num != len(data):
-            read.accounting_ok = False
         if not data:
             read.ended_on_empty_page = True
             return read
-        rids: list[int] = []
-        for record in data:
-            cell = record.get("3") if isinstance(record, dict) else None
-            rid = _int(cell.get("value")) if isinstance(cell, dict) else None
-            if rid is None:
-                raise RunError("QB_PROTOCOL", f"{label}: a record has no integer Record ID# (field 3)")
-            rids.append(rid)
-            modified = record.get("2")
-            read.modified[rid] = modified.get("value") if isinstance(modified, dict) else None
-        if any(b <= a for a, b in zip(rids, rids[1:], strict=False)) or rids[0] <= last:
+        if not _ascending(rids, last):
             read.accounting_ok = False
         read.retrieved += len(data)
         if max(rids) <= last:
@@ -275,6 +298,74 @@ def read_table(
     raise RunError(
         "QB_MAX_PAGES", f"{label}: more than {max_pages} pages; raise limits.max_pages deliberately"
     )
+
+
+def _read_skip(
+    client: QuickbaseClient,
+    table: TableMap,
+    select: list[int],
+    base: str | None,
+    page_size: int,
+    max_pages: int,
+) -> TableRead:
+    """SPEC §12.1 fallback: ``skip`` paging, sorted by Record ID#, with per-page total accounting. Every page
+    must report the same total, and record ids must be unique and ascending across pages."""
+    label = f"table {table.role} ({table.table_id})"
+    read = TableRead(paging="skip")
+    seen: set[int] = set()
+    floor = 0
+    for _ in range(max_pages):
+        body: dict[str, Any] = {
+            "from": table.table_id,
+            "select": select,
+            "sortBy": [{"fieldId": 3, "order": "ASC"}],
+            "options": {"skip": read.retrieved, "top": page_size},
+        }
+        if base:
+            body["where"] = base
+        page = client.run_query(body)
+        total, data, rids = _check_page(read, page, select, label)
+        if total != read.total0:
+            read.accounting_ok = False
+            log.warning("%s: page total %d != first total %s; the table changed", label, total, read.total0)
+        if not data:
+            read.ended_on_empty_page = True
+            return read
+        if not _ascending(rids, floor) or seen.intersection(rids):
+            read.accounting_ok = False
+        seen.update(rids)
+        floor = max(floor, max(rids))
+        read.retrieved += len(data)
+    raise RunError(
+        "QB_MAX_PAGES", f"{label}: more than {max_pages} pages; raise limits.max_pages deliberately"
+    )
+
+
+def read_table(
+    client: QuickbaseClient,
+    table: TableMap,
+    select: list[int],
+    base: str | None,
+    page_size: int,
+    max_pages: int,
+    *,
+    paging: str = "auto",
+) -> TableRead:
+    """Read a whole table (SPEC §12.5 step 2): keyset pagination on Record ID#, or — when the source refuses
+    the ``{3.GT.n}`` comparison on the first page — ``skip`` paging (SPEC §12.1). ``paging`` forces a mode,
+    so that pass 2 uses the mode pass 1 used."""
+    if paging not in ("auto", "keyset", "skip"):
+        raise ValueError(f"unknown paging mode {paging!r}")
+    if paging != "skip":
+        try:
+            return _read_keyset(
+                client, table, select, base, page_size, max_pages, allow_fallback=paging == "auto"
+            )
+        except _KeysetRefused:
+            log.warning(
+                "table %s (%s): {3.GT.n} was refused; falling back to skip paging", table.role, table.table_id
+            )
+    return _read_skip(client, table, select, base, page_size, max_pages)
 
 
 # ----------------------------------------------------------------------------------------------- capture
@@ -375,7 +466,15 @@ def capture(
         # 4. pass 2, only after every table's pass 1: fields 2 and 3 again, compared with pass 1
         two_pass: dict[str, str] = {}
         for role, table in mapping.tables.items():
-            second = read_table(client, table, [2, 3], base_where[role], config.page_size, config.max_pages)
+            second = read_table(
+                client,
+                table,
+                [2, 3],
+                base_where[role],
+                config.page_size,
+                config.max_pages,
+                paging=reads[role].paging,
+            )
             emit(
                 f"tables/{role}/pass2.json",
                 json_bytes({str(rid): second.modified[rid] for rid in sorted(second.modified)}),
@@ -431,6 +530,7 @@ def capture(
                     "total_records": reads[role].total0 or 0,
                     "retrieved": reads[role].retrieved,
                     "two_pass": two_pass[role],
+                    "paging": reads[role].paging,
                 }
                 for role, table in mapping.tables.items()
             },
