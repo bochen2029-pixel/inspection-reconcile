@@ -224,6 +224,8 @@ class FakeRealm(MockApp):
         table_id, data = body.get("to"), body.get("data")
         if set(body) - UPSERT_KEYS or table_id not in self.tables or not isinstance(data, list) or not data:
             return bad("upsert: unexpected body")
+        if "mergeFieldId" in body:  # OpenAPI allows it; the builder only adds, so here it is a defect
+            return bad("upsert: mergeFieldId would update records")
         by_id = {f["id"]: f for f in self.fields[table_id]}
         created: list[dict[str, Any]] = []
         line_errors: dict[str, list[str]] = {}
@@ -404,6 +406,10 @@ def test_build_capture_normalize_assess_gives_the_s01_findings(tmp_path: Path, c
     assert sorted(hashlib.sha256(data).hexdigest() for _, data in realm.blobs.values()) == s01_files()
     approvals = realm.records[list(realm.tables)[3]]
     assert {r["12"]["value"]["email"] for r in approvals} == {OWNER["email"]}  # Decided By: the token's user
+    choices = [
+        f for fields in realm.fields.values() for f in fields if f["fieldType"] == "text-multiple-choice"
+    ]
+    assert len(choices) == 5 and all(f["properties"]["allowNewChoices"] is False for f in choices)
 
     config = load_capture_config(tmp_path / "local" / "qb-capture.yml")
     assert (config.realm_hostname, config.app_id, config.token_env) == (REALM, app_id, "QB_USER_TOKEN")
@@ -615,13 +621,29 @@ def test_a_table_whose_key_field_is_not_record_id_stops_the_build(tmp_path: Path
     assert not any(r.url.path in ("/v1/fields", "/v1/records") for r in realm.requests)
 
 
+MAY_EXIST = (
+    f"An app named 'inspection-reconcile C3 test 2026-10-01 18:00 UTC' may have been created in {REALM}; "
+    "check for it before running again."
+)
+
+
 @pytest.mark.parametrize(
     ("failure", "may_exist"),
-    [(502, True), ("timeout", True), ("ctrl-c", True), ("unreadable", True), (400, False)],
+    [
+        (502, True),
+        ("timeout", True),
+        ("ctrl-c", True),
+        ("not json", True),
+        ("no id", True),
+        ("unexpected", True),
+        (400, False),
+        (429, False),
+    ],
 )
 def test_a_failed_create_app_says_whether_an_app_may_already_exist(
     tmp_path: Path, capsys: Any, failure: Any, may_exist: bool
 ) -> None:
+    """Once createApp is sent, only a definite refusal (4xx, exhausted 429s) proves that no app exists."""
     realm = FakeRealm()
 
     def fail(request: httpx.Request, body: Any) -> httpx.Response | None:
@@ -631,20 +653,38 @@ def test_a_failed_create_app_says_whether_an_app_may_already_exist(
             raise httpx.ReadTimeout("no answer", request=request)
         if failure == "ctrl-c":
             raise KeyboardInterrupt
-        if failure == "unreadable":
+        if failure == "unexpected":
+            raise ValueError("a defect after the send")
+        if failure == "not json":
             return httpx.Response(200, content=b"<html>created</html>")
-        return httpx.Response(failure, json={"message": "nope"})
+        if failure == "no id":
+            return httpx.Response(200, json={"name": "created, but no id"})
+        return httpx.Response(failure, headers={"retry-after": "0"}, json={"message": "nope"})
 
     realm.hooks.append(fail)
     assert run_builder(realm, tmp_path, "--yes") == 2
     err = capsys.readouterr().err
-    sentence = (
-        f"An app named 'inspection-reconcile C3 test 2026-10-01 18:00 UTC' may have been created in {REALM}; "
-        "check for it before running again."
-    )
-    assert (sentence in err) is may_exist, err
-    assert len(realm.requests) == 1  # createApp is never repeated
+    assert (MAY_EXIST in err) is may_exist, err
+    assert ("APP_MAY_EXIST" in err) is may_exist
+    assert len(realm.requests) == (5 if failure == 429 else 1)  # a write is never repeated; a 429 is
     assert not (tmp_path / "local").exists()
+
+
+@pytest.mark.parametrize("where", ["while S01 loads", "in the limiter, before the first request"])
+def test_ctrl_c_before_create_app_is_sent_claims_no_app(
+    tmp_path: Path, capsys: Any, monkeypatch: Any, where: str
+) -> None:
+    def interrupted(*args: Any) -> Any:
+        raise KeyboardInterrupt
+
+    if where == "while S01 loads":
+        monkeypatch.setattr(qb, "load_s01", interrupted)  # before build() opens its try
+    else:
+        monkeypatch.setattr(qb.BuilderClient, "_throttle", interrupted)  # inside it, but nothing sent yet
+    realm = FakeRealm()
+    assert run_builder(realm, tmp_path, "--yes") == 130
+    err = capsys.readouterr().err
+    assert err.strip() == "error: INTERRUPTED: stopped by Ctrl+C" and realm.requests == []
 
 
 # -- 429, failed writes, refused records, redirects, the rate limit --------------------------------------------
@@ -774,3 +814,250 @@ def test_the_token_comes_from_the_named_variable_or_a_file_never_the_command_lin
         qb.parse_args(["--realm", REALM, "--token-env", "X", "--token-file", "f"])
     with pytest.raises(SystemExit):
         qb.parse_args(["--realm", REALM, "--token", TOKEN])
+
+
+PASTED = "b9xyz7_qrst_0_d4f8g2h6j1k3l5m7n9p0q2r4s6t8"  # token-shaped: what a pasted user token looks like
+
+
+@pytest.mark.parametrize("flag", ["--token-env", "--token-file"])
+@pytest.mark.parametrize("yes", [False, True])
+def test_a_token_pasted_where_a_name_or_path_belongs_is_never_shown(
+    tmp_path: Path, capsys: Any, flag: str, yes: bool
+) -> None:
+    realm = FakeRealm()
+    code = run_builder(realm, tmp_path, flag, PASTED, *(["--yes"] if yes else []), env={})
+    out = capsys.readouterr()
+    assert PASTED not in out.out + out.err
+    assert realm.requests == []
+    assert code == (2 if yes or flag == "--token-env" else 0)
+
+
+def test_a_token_file_with_a_bom_works_and_a_utf16_one_is_named(tmp_path: Path, capsys: Any) -> None:
+    bom = tmp_path / "qb_token_bom"
+    bom.write_bytes(b"\xef\xbb\xbf" + TOKEN.encode() + b"\r\n")  # what Notepad may write
+    assert run_builder(FakeRealm(), tmp_path / "a", "--yes", "--token-file", bom.as_posix(), env={}) == 0
+    capsys.readouterr()
+    utf16 = tmp_path / "qb_token_utf16"
+    utf16.write_bytes(TOKEN.encode("utf-16"))  # what Windows PowerShell 5.1's > writes
+    realm = FakeRealm()
+    assert run_builder(realm, tmp_path / "b", "--yes", "--token-file", utf16.as_posix(), env={}) == 2
+    err = capsys.readouterr().err
+    assert "QB_TOKEN_MISSING" in err and "is not UTF-8 text" in err and realm.requests == []
+
+
+# -- answers that do not match what was asked -----------------------------------------------------------------
+
+
+def reply(realm: FakeRealm, when: Any, change: Any) -> None:
+    """Let the fake answer as usual, then change the answer of the requests that ``when(request, body)`` picks."""
+
+    def hook(request: httpx.Request, body: Any) -> httpx.Response | None:
+        if not when(request, body):
+            return None
+        realm.hooks.remove(hook)  # answer this request normally, then alter it
+        try:
+            answer = realm(request)
+        finally:
+            realm.hooks.append(hook)
+        realm.requests.pop()  # the inner call logged it a second time
+        return httpx.Response(answer.status_code, json=change(answer.json()))
+
+    realm.hooks.append(hook)
+
+
+def label_is(label: str) -> Any:
+    return lambda request, body: isinstance(body, dict) and body.get("label") == label
+
+
+@pytest.mark.parametrize(
+    ("when", "change", "message"),
+    [
+        (
+            label_is("Completed At"),
+            lambda answer: {**answer, "fieldType": "datetime"},
+            "Inspections.Completed At was created as fieldType 'datetime', not 'timestamp'",
+        ),
+        (
+            label_is("Decided By"),
+            lambda answer: {**answer, "id": 4},
+            "Approvals.Decided By: Quickbase answered field id 4, not a new field",
+        ),
+        (
+            label_is("Asset ID"),
+            lambda answer: {**answer, "id": 6},
+            "Obligations.Asset ID: Quickbase answered field id 6, not a new field",
+        ),
+        (
+            lambda request, body: request.url.path.endswith("/relationship"),
+            lambda answer: {**answer, "parentTableId": answer["childTableId"]},
+            "Inspections: the relationship joins",
+        ),
+        (
+            lambda request, body: request.url.path.endswith("/relationship"),
+            lambda answer: {**answer, "lookupFields": [{"id": 30, "label": "Project ID", "type": "text"}]},
+            "Inspections: the relationship came with lookup or summary fields",
+        ),
+        (
+            lambda request, body: request.method == "GET" and request.url.path == "/v1/fields",
+            lambda answer: [{**f, "fieldType": "text"} if f["id"] == 4 else f for f in answer],
+            "obligations: field 4 (Record Owner) is not a user field",
+        ),
+        (
+            lambda request, body: request.url.path == "/v1/records",
+            lambda answer: {
+                **answer,
+                "metadata": {
+                    **answer["metadata"],
+                    "createdRecordIds": [n + 1000 for n in answer["metadata"]["createdRecordIds"]],
+                },
+            },
+            "upsert into Obligations: the returned records do not match the records sent",
+        ),
+    ],
+    ids=[
+        "datetime answered",
+        "built-in field id",
+        "reused field id",
+        "relationship ends",
+        "lookup fields",
+        "Record Owner type",
+        "createdRecordIds",
+    ],
+)
+def test_an_answer_that_differs_from_what_was_asked_stops_the_build_before_any_record(
+    tmp_path: Path, capsys: Any, when: Any, change: Any, message: str
+) -> None:
+    realm = FakeRealm()
+    reply(realm, when, change)
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    err = capsys.readouterr().err
+    assert "BUILD_INCOMPLETE" in err and message in err, err
+    upserts = sum(1 for r in realm.requests if r.url.path == "/v1/records")
+    assert upserts == (
+        1 if message.startswith("upsert into") else 0
+    )  # the build stops at the first bad answer
+    assert not (tmp_path / "local").exists()
+
+
+@pytest.mark.parametrize("failure", [502, "timeout"])
+@pytest.mark.parametrize(
+    "operation",
+    ["createApp", "createTable", "createField", "createRelationship", "upsert"],
+)
+def test_no_write_is_ever_repeated(tmp_path: Path, capsys: Any, operation: str, failure: Any) -> None:
+    paths = {
+        "createApp": "/v1/apps",
+        "createTable": "/v1/tables",
+        "createField": "/v1/fields",
+        "upsert": "/v1/records",
+    }
+    realm = FakeRealm()
+    state = {"done": False}
+
+    def picked(request: httpx.Request) -> bool:
+        if request.method != "POST":
+            return False
+        if operation == "createRelationship":
+            return request.url.path.endswith("/relationship")
+        return request.url.path == paths[operation]
+
+    def fail_first(request: httpx.Request, body: Any) -> httpx.Response | None:
+        if state["done"] or not picked(request):
+            return None
+        state["done"] = True
+        if failure == "timeout":
+            raise httpx.ReadTimeout("no answer", request=request)
+        return httpx.Response(failure, json={"message": "Bad Gateway"})
+
+    realm.hooks.append(fail_first)
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    err = capsys.readouterr().err
+    assert "QB_WRITE_FAILED" in err and "never repeated" in err
+    assert sum(1 for r in realm.requests if picked(r)) == 1  # sent once, then the build stopped
+    assert picked(realm.requests[-1])
+
+
+def test_decided_by_id_names_another_realm_user(tmp_path: Path, capsys: Any) -> None:
+    other = {
+        "email": "reviewer@example.invalid",
+        "id": "77777777.oth",
+        "name": "Other User",
+        "userName": "other",
+    }
+    realm = FakeRealm()
+    realm.users[other["id"]] = other
+    assert run_builder(realm, tmp_path, "--yes", "--decided-by-id", other["id"]) == 0
+    approvals = realm.records[list(realm.tables)[3]]
+    assert {r["12"]["value"]["id"] for r in approvals} == {other["id"]}
+    capsys.readouterr()
+    unknown = FakeRealm()
+    assert run_builder(unknown, tmp_path / "b", "--yes", "--decided-by-id", "99999999.unk") == 2
+    assert "QB_LINE_ERRORS" in capsys.readouterr().err
+
+
+def test_a_long_retry_after_is_capped(tmp_path: Path) -> None:
+    realm, ft = FakeRealm(), FakeTime()
+    state = {"done": False}
+
+    def once(request: httpx.Request, body: Any) -> httpx.Response | None:
+        if not state["done"] and request.url.path == "/v1/tables":
+            state["done"] = True
+            return httpx.Response(
+                429, headers={"retry-after": "86400"}, json={"message": "Too Many Requests"}
+            )
+        return None
+
+    realm.hooks.append(once)
+    assert run_builder(realm, tmp_path, "--yes", ft=ft) == 0
+    assert 60.0 in ft.sleeps and max(ft.sleeps) <= 60.0
+
+
+# -- the local files ------------------------------------------------------------------------------------------
+
+
+def test_when_only_the_local_files_fail_the_app_is_reported_complete(
+    tmp_path: Path, capsys: Any, monkeypatch: Any
+) -> None:
+    def refuse(out: Path, files: Any) -> Any:
+        raise qb.RunError("WRITE_FAILED", f"{out.as_posix()}: Access is denied")
+
+    monkeypatch.setattr(qb, "write_files", refuse)
+    realm = FakeRealm()
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    out = capsys.readouterr()
+    (app_id,) = realm.apps
+    assert f"app {app_id} in {REALM} is complete; only writing the local files failed" in out.err
+    assert "BUILD_INCOMPLETE" not in out.err and "delete" not in out.err
+    assert "mapping_id: quickbase-live" in out.out and "schema: inspection-reconcile/qb-capture/v1" in out.out
+    assert TOKEN not in out.out + out.err
+
+
+def test_the_two_outputs_must_be_two_files(tmp_path: Path, capsys: Any) -> None:
+    realm = FakeRealm()
+    same = (tmp_path / "local" / "both.yml").as_posix()
+    argv = ["--realm", REALM, "--mapping-out", same, "--config-out", same, "--yes"]
+    assert qb.main(argv, transport=httpx.MockTransport(realm), environ={"QB_USER_TOKEN": TOKEN}) == 2
+    assert "two different files" in capsys.readouterr().err and realm.requests == []
+
+
+@pytest.mark.parametrize("output", ["mapping", "config"])
+def test_an_output_that_does_not_carry_this_runs_ids_is_never_written(
+    tmp_path: Path, capsys: Any, monkeypatch: Any, output: str
+) -> None:
+    """Both files are checked with the package's own loaders and against the ledger before they are written."""
+    if output == "mapping":  # the demo's synthetic table ids instead of this run's: caught before any record
+        demo = qb.DEMO_MAPPING.read_text(encoding="utf-8").replace(
+            "mapping_id: quickbase-demo", "mapping_id: quickbase-live"
+        )
+        monkeypatch.setattr(qb, "live_mapping_text", lambda *args: demo)
+    else:
+        real = qb.capture_config_text
+        monkeypatch.setattr(
+            qb, "capture_config_text", lambda *args: real(*args).replace('app_id: "', 'app_id: "x')
+        )
+    realm = FakeRealm()
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    err = capsys.readouterr().err
+    assert "BUILD_INCOMPLETE: INTERNAL" in err, err
+    assert any(r.url.path == "/v1/records" for r in realm.requests) is (output == "config")
+    assert not (tmp_path / "local").exists()
