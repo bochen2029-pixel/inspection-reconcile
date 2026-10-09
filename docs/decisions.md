@@ -114,3 +114,13 @@ PASS that the data does not establish:
 
 Each fix has a regression test that fails without it. The fixture identities are unchanged. The fifth finding,
 a download held in memory before its size check, is helper task T5: a streamed download with a cap.
+
+## D-013 · 2026-10-09 · Streamed downloads with a size cap (SPEC §12.4, §12.5 step 3, §22.10)
+Before, a file far over `max_file_bytes` was fully downloaded and decoded, using roughly 3.7 times its size in
+memory, before being marked `too_large`. A huge attachment could end the run instead.
+- **Streaming.** Every client request now streams, and the status line decides a retry before any body is read.
+- **The cap.** `download_file` stops once the base64 payload passes 4·⌈max/3⌉ characters, so memory is O(cap).
+- **The recorded size.** A `too_large` entry records `bytes` only when the whole body was read; a download
+  stopped early leaves it null.
+
+Helper task T5 implemented this, with 36 tests, and it was reviewed before the merge.

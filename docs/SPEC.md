@@ -2234,7 +2234,8 @@ Found while implementing C2:
 - **Two-pass result.** A capture writes `two_pass` as `stable` or `changed`. `not_run` appears only in fixture exports. A table is `stable` only when three things hold: its pass-1 accounting held, its pass-2 read was complete, and both passes saw the same `{record id: date modified}` map.
 - **File entries.** The files of in-scope current artifacts are `captured`, `not_captured` (with `capture_files: false`), `too_large` or `error` (a failed download). Every other artifact file is `out_of_scope` and is not downloaded.
   - An entry that is not `captured` has `path` and `sha256` null.
-  - Its `bytes` is null too, except on a `too_large` entry, which records the size received.
+  - Its `bytes` is null too, except on a `too_large` entry. That entry records the decoded size only when the whole body was read (decision D-013).
+  - The client streams a file body and never holds more than its base64 size limit: 4·⌈`max_file_bytes`/3⌉ payload characters, whitespace excluded. A download stopped at that limit leaves `bytes` null, because the full size is unknown.
   - `normalize` refuses any other combination (`EXPORT_INVALID`).
 - **Coverage declarations** (§12.5 step 6):
   - **An incomplete read** is `partial` with `[pagination_incomplete]`.
