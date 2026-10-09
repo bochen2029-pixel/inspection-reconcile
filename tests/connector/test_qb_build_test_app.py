@@ -1061,3 +1061,16 @@ def test_an_output_that_does_not_carry_this_runs_ids_is_never_written(
     assert "BUILD_INCOMPLETE: INTERNAL" in err, err
     assert any(r.url.path == "/v1/records" for r in realm.requests) is (output == "config")
     assert not (tmp_path / "local").exists()
+
+
+@pytest.mark.parametrize("yes", [False, True])
+def test_without_the_quickbase_extra_the_builder_says_what_to_install(
+    tmp_path: Path, capsys: Any, monkeypatch: Any, yes: bool
+) -> None:
+    """After a plain `uv sync` httpx is absent, and so is every import of the package's Quickbase client."""
+    monkeypatch.setattr(qb, "QUICKBASE_EXTRA", False)
+    realm = FakeRealm()
+    assert run_builder(realm, tmp_path, *(["--yes"] if yes else [])) == 2
+    out = capsys.readouterr()
+    assert out.err.startswith("error: NOT_AVAILABLE:") and "uv sync --extra quickbase" in out.err
+    assert out.out == "" and realm.requests == [] and not (tmp_path / "local").exists()

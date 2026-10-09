@@ -41,8 +41,6 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import httpx
-
 from inspection_reconcile.adapters.mapping import (
     REQUIRED_ROLES,
     ROLE_DATASET,
@@ -52,11 +50,21 @@ from inspection_reconcile.adapters.mapping import (
     verify_fields,
 )
 from inspection_reconcile.adapters.mapping import Mapping as FieldMapping
-from inspection_reconcile.adapters.qb_capture import parse_capture_config
-from inspection_reconcile.adapters.qb_client import BASE_URL, TokenRedactionFilter, redact
 from inspection_reconcile.errors import RunError
 from inspection_reconcile.io.writer import write_files
 from inspection_reconcile.yamlsafe import loads_yaml
+
+try:  # httpx comes with the quickbase extra; so does every import of the package's Quickbase client
+    import httpx
+
+    from inspection_reconcile.adapters.qb_capture import parse_capture_config
+    from inspection_reconcile.adapters.qb_client import BASE_URL, TokenRedactionFilter, redact
+except ModuleNotFoundError as missing:
+    if missing.name != "httpx":
+        raise
+    QUICKBASE_EXTRA = False  # main() says what to install instead of a traceback
+else:
+    QUICKBASE_EXTRA = True
 
 REPO = Path(__file__).resolve().parents[1]
 DEMO_MAPPING = REPO / "mappings" / "quickbase-demo.yml"
@@ -850,6 +858,13 @@ def main(
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> int:
     args = parse_args(argv)
+    if not QUICKBASE_EXTRA:
+        print(
+            "error: NOT_AVAILABLE: the builder needs the quickbase extra (httpx): run `uv sync --extra quickbase`"
+            " (or `uv sync --all-extras`)",
+            file=sys.stderr,
+        )
+        return 2
     env = os.environ if environ is None else environ
     token: str | None = None
     try:
