@@ -464,7 +464,7 @@ R0 runs in the fixed order below. Each step sees the quarantine decisions of the
 - **`MALFORMED_ROW` (UNKNOWN).** A row whose field count differs from the header. The row is quarantined and unattributable. Identical malformed rows in one dataset merge into one finding with `observed.count`.
 - **Cell validation.** Every other row has each schema column checked against its type, its required rule and its enum. Each violation is classified:
   - `INVALID_PATH` for a `relative_path` grammar violation;
-  - `UNMAPPED_VALUE` for a cell that the snapshot's normalization file lists as unmapped (§12.3);
+  - `UNMAPPED_VALUE` for a cell that the snapshot's normalization file lists as unmapped (§12.3), even when the cell satisfies its grammar (AM-7);
   - `INVALID_VALUE` for everything else.
 
   A row with any violation is **quarantined**. Each code produces one finding per row subject. All rows that share a subject and a code merge into one finding, and `observed.violations` lists the distinct `{field, value, rule}` triples, sorted.
@@ -1153,7 +1153,7 @@ tables:
 
   `normalize` checks the export's `fields.json` against this table, and C2 checks the live field list. A mismatch is a run error that names both values. Every mapped field MUST also have a blank `mode` (a data-entry field), except where the mapping explicitly declares `allow_derived: true`.
 - **Value maps.** `values` maps source labels to canonical enum values, exactly and case-sensitively. Keys MUST be strings (§6.2). A label missing from the map is never guessed. The canonical cell receives the raw label, and `normalization.json` lists it under `unmapped_values`, keyed by the row's `x_source` and the field. R0 then reports `UNMAPPED_VALUE`.
-- **Conversions**, from the verified formats of §12.1. Any other JSON type produces a canonical cell holding the canonical JSON text of the value, which then fails its grammar (`INVALID_VALUE`).
+- **Conversions**, from the verified formats of §12.1. Any other JSON type produces a canonical cell holding the canonical JSON text of the value, and `normalization.json` lists that cell under `unmapped_values`, so R0 reports `UNMAPPED_VALUE` whether or not the text satisfies the column grammar (AM-7).
 
   | type | source value | canonical value |
   |---|---|---|
@@ -2223,7 +2223,7 @@ Found while implementing B1/B2:
 - **Derived fields.** `allow_derived` is a table-level boolean.
 - **Long file names.** The 8-hex-digit suffix is taken from the SHA-256 of the original (unsanitized) name in UTF-8.
 - **Export manifest.** `two_pass` is `not_run`, `stable` or `changed`. A `files[]` entry that is not `captured` has `path`, `bytes` and `sha256` set to null (except `bytes` on a `too_large` entry, AM-4); a captured entry has all three and a safe relative path.
-- **`normalize` refuses an inconsistent export** (`EXPORT_INVALID`): page files that differ from `tables[role].pages`, a record count that differs from `retrieved`, captured bytes that differ from the declared size or SHA-256, an unmapped table or a mapped table missing, or a record lacking a mapped field.
+- **`normalize` refuses an inconsistent export** (`EXPORT_INVALID`): page files that differ from `tables[role].pages`, a record count that differs from `retrieved`, captured bytes that differ from the declared size or SHA-256, an unmapped table or a mapped table missing, or a record lacking a mapped field. AM-7 adds two refusals: a record's file version with no `files[]` entry, and a repeated Record ID# in a table whose read the manifest declares clean.
 
 ---
 
@@ -2280,5 +2280,16 @@ Found while preparing C3. The import files written by `--quickbase-import` could
 - **References.** A new, empty table numbers its records 1, 2, … in import order. Each reference column therefore holds the parent's 1-based row position in the parent's import file. Before, it held the record IDs of the synthetic S16 export (101 and up), which do not exist in a fresh table.
 - **Decided By.** `approvals.csv` includes `Decided By`, because `decided_by` is required (§5.5). A User field accepts only users of the realm, so `--decided-by EMAIL` sets the value; the default is the synthetic reviewer.
 - **The procedure.** `docs/c3-runbook.md` turns Appendix D into commands. Its check is that the live assessment adds, removes and changes no finding's outcome or reason. `compare` still reports differences in `observed`, because the coverage basis legitimately differs (D-005).
+
+---
+
+### 22.13 Amendment AM-7: adapter review corrections (decision D-012)
+
+A spec-only review of the four adapter modules reproduced each defect below through the mock app or an edited S16 export. Each turned a capture or export artifact into a source-data FAIL or PASS that the data does not establish. Each now has a regression test that fails on the old code.
+
+- **A repeated Record ID#.** Record IDs are unique within a Quickbase table, so a record delivered twice is a capture artifact, for example from a page that re-delivered records before the stall guard stopped the read. `normalize` keeps the first occurrence when the table's manifest entry already reports a failed read (`retrieved ≠ total_records`, or `two_pass: changed`); the coverage declaration carries the uncertainty. Otherwise the export is refused (`EXPORT_INVALID`). Before, the repeat became a `DUPLICATE_KEY` FAIL, so an UNKNOWN status turned into BLOCKED.
+- **A listed unmapped cell is always a violation (§7.5.1).** It reports `UNMAPPED_VALUE` even when it satisfies the column grammar. Before, a label such as `photo`, when the map knows only `Photo`, passed as a valid kind.
+- **Unexpected JSON types (§12.3 Conversions).** They are listed as unmapped too. Before, `123` in a text field became a valid ID, and `1.5` a valid revision. The rule still holds at the source: `verify_fields` pins each field type, and Quickbase returns the documented JSON types.
+- **The file list is closed-world.** A record's latest file version with no `files[]` entry is refused (`EXPORT_INVALID`). Before, it became a `FILE_ABSENT` FAIL under complete evidence coverage.
 
 *End of specification v3.0.*

@@ -42,16 +42,18 @@ def validate_row(raw: RawRow, unmapped: frozenset[tuple[str, str, str]]) -> Row:
     for column, type_name, required in SCHEMAS[dataset]:
         cell = raw.cells[column]
         value, rule = check_cell(type_name, cell, required)
-        if rule is None:
+        # §12.3: a label missing from the map is never accepted, even when it happens to satisfy the grammar.
+        listed = (dataset, raw.source or "", column) in unmapped
+        if rule is None and not listed:
             values[column] = value
             continue
         bad_columns.add(column)
-        source = raw.source or ""
-        if (dataset, source, column) in unmapped:
+        if listed:
             violations.append(Violation(column, cell, "unmapped", "UNMAPPED_VALUE"))
-        elif rule.startswith("path:"):
+        elif rule is not None and rule.startswith("path:"):
             violations.append(Violation(column, cell, rule, "INVALID_PATH"))
         else:
+            assert rule is not None  # not listed as unmapped, so the grammar failed
             violations.append(Violation(column, cell, rule, "INVALID_VALUE"))
     key_fields = KEY_FIELDS[dataset]
     key: tuple[str, ...] | None = None

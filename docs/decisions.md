@@ -101,3 +101,16 @@ Preparing C3 showed that the generated import files would not have built a worki
 
 A test checks that every reference column resolves to the parent named by S01's canonical snapshot.
 `docs/c3-runbook.md` gives the procedure. The fixtures are unchanged (`--check`: 0 problems).
+
+## D-012 · 2026-10-09 · Amendment AM-7: adapter review corrections (SPEC §7.5.1, §12.3, §22.9, §22.13)
+A spec-only review of the adapters reproduced four ways in which a capture or export artifact became a FAIL or
+PASS that the data does not establish:
+- **A re-delivered record** became a `DUPLICATE_KEY` FAIL. `normalize` now keeps the first occurrence when the
+  read is already reported as failed, and refuses the export otherwise.
+- **A grammar-valid unmapped label** was accepted. Listed cells now always report `UNMAPPED_VALUE`.
+- **An unexpected JSON type** could satisfy its grammar: `123` in a text field, for example, gave a false R3
+  FAIL. It is now listed as unmapped.
+- **A file version with no `files[]` entry** became a `FILE_ABSENT` FAIL. It is now refused.
+
+Each fix has a regression test that fails without it. The fixture identities are unchanged. The fifth finding,
+a download held in memory before its size check, is helper task T5: a streamed download with a cap.

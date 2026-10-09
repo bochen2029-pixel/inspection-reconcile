@@ -3,8 +3,8 @@ mapping (SPEC §12.3).
 
 Nothing is guessed: an unmapped multiple-choice label is written raw and listed in ``normalization.json``
 (R0 then reports ``UNMAPPED_VALUE``); a reference to an uncaptured record becomes the placeholder
-``qbrid.<table>.<rid>``; a value of an unexpected JSON type becomes its canonical JSON text, which then fails
-its grammar (``INVALID_VALUE``). Files are copied under the evidence root only when the export captured them.
+``qbrid.<table>.<rid>``; a value of an unexpected JSON type becomes its canonical JSON text and is listed as
+unmapped too (AM-7). Files are copied under the evidence root only when the export captured them.
 """
 
 from __future__ import annotations
@@ -213,8 +213,16 @@ def sanitize_file_name(name: str) -> str:
 
 
 def json_text(value: Any) -> str:
-    """The canonical JSON text of a value of an unexpected type (it then fails its column grammar)."""
+    """The canonical JSON text of a value of an unexpected type."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _unexpected(value: Any) -> Converted:
+    """A JSON type the §12.3 table does not accept for its mapping type. The cell is its canonical JSON text, and
+    the cell is listed as unmapped, so R0 reports it whether or not that text satisfies the column grammar
+    (``1.5`` is a valid TEXT, ``123`` a valid ID): it is never guessed (I-9, AM-7)."""
+    text = json_text(value)
+    return Converted(text, unmapped_label=text)
 
 
 def _integer(value: Any) -> int | None:
@@ -242,7 +250,7 @@ def convert_value(fm: FieldMap, value: Any) -> Converted:
     if t in ("text", "timestamp"):
         if isinstance(value, str):
             return Converted(value if value != "" else None)
-        return Converted(json_text(value))
+        return _unexpected(value)
     if t == "text-multiple-choice":
         label: str | None
         if isinstance(value, str):
@@ -252,7 +260,7 @@ def convert_value(fm: FieldMap, value: Any) -> Converted:
         elif isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
             label = value[0]
         else:
-            return Converted(json_text(value))
+            return _unexpected(value)
         if label == "":
             return Converted(None)
         if fm.values is None:
@@ -263,15 +271,15 @@ def convert_value(fm: FieldMap, value: Any) -> Converted:
         return Converted(mapped)
     if t in ("numeric", "recordid"):
         n = _integer(value)
-        return Converted(str(n) if n is not None else json_text(value))
+        return Converted(str(n)) if n is not None else _unexpected(value)
     if t == "checkbox":
         if isinstance(value, bool):
             return Converted("true" if value else "false")
-        return Converted(json_text(value))
+        return _unexpected(value)
     if t == "user":
         if isinstance(value, dict) and isinstance(value.get("email"), str):
             return Converted(value["email"] if value["email"] != "" else None)
-        return Converted(json_text(value))
+        return _unexpected(value)
     raise ValueError(f"convert_value does not handle type {t!r}")  # reference and file are contextual
 
 
@@ -345,6 +353,17 @@ def records_from_pages(table: TableMap, pages: list[Any], label: str) -> list[So
             if rid is None:
                 raise _invalid(f"{where}: field 3 (Record ID#) is not a positive integer: {values[3]!r}")
             out.append(SourceRecord(rid, values))
+    return out
+
+
+def unique_records(records: list[SourceRecord]) -> list[SourceRecord]:
+    """The first occurrence of each Record ID#, in page order."""
+    seen: set[int] = set()
+    out: list[SourceRecord] = []
+    for rec in records:
+        if rec.rid not in seen:
+            seen.add(rec.rid)
+            out.append(rec)
     return out
 
 
@@ -425,6 +444,13 @@ def convert_export(
                 f"table {role}: the manifest says {entry['retrieved']} record(s) were retrieved but the pages hold "
                 f"{len(records[role])}"
             )
+        rids = [rec.rid for rec in records[role]]
+        if len(set(rids)) != len(rids):
+            # Record IDs are unique within a Quickbase table, so a repeat is a capture artifact: a page that
+            # re-delivered a record. It is tolerated only where the manifest already reports a failed read.
+            if entry["retrieved"] == entry["total_records"] and entry["two_pass"] != "changed":
+                raise _invalid(f"table {role}: a Record ID# repeats in a read the manifest declares clean")
+            records[role] = unique_records(records[role])
 
     files_index: dict[tuple[str, int, int, int], dict[str, Any]] = {}
     for item in manifest["files"]:
@@ -440,7 +466,9 @@ def convert_records(
 ) -> tuple[dict[str, list[tuple[dict[str, str | None], int]]], _Notes]:
     """Convert source records into canonical rows per dataset, as (cells with x_source, Record ID#), sorted by
     key then Record ID#. ``files_index`` maps (table, rid, fid, version) to the export's file entries; files
-    whose entry is ``captured`` are scheduled for copying in the returned notes."""
+    whose entry is ``captured`` are scheduled for copying in the returned notes. With an index (normalize),
+    every record's latest file version must have an entry: the export's file list is closed-world."""
+    require_entries = files_index is not None
     files_index = files_index or {}
     # Each reference target: Record ID# -> the canonical id its key column converts to.
     key_maps: dict[str, dict[int, str | None]] = {}
@@ -471,7 +499,7 @@ def convert_records(
                 if fm.type == "reference":
                     cells[column] = _resolve_reference(fm, value, mapping, key_maps, notes, dataset, source)
                 elif fm.type == "file":
-                    cells[column] = _file_cell(table, fm, rec, files_index, notes)
+                    cells[column] = _file_cell(table, fm, rec, files_index, notes, require_entries)
                 else:
                     converted = convert_value(fm, value)
                     cells[column] = converted.cell
@@ -522,6 +550,7 @@ def _file_cell(
     rec: SourceRecord,
     files_index: dict[tuple[str, int, int, int], dict[str, Any]],
     notes: _Notes,
+    require_entries: bool = False,
 ) -> str | None:
     value = rec.values[fm.fid]
     if value is None:
@@ -535,6 +564,11 @@ def _file_cell(
     relative = file_relative_path(table.table_id, rec.rid, fm.fid, version, original)
     notes.files.append({"relative_path": relative, "original_name": original})
     entry = files_index.get((table.table_id, rec.rid, fm.fid, version))
+    if entry is None and require_entries:
+        raise _invalid(
+            f"table {table.role}: record {rec.rid} has file version v{version} in field {fm.fid}, "
+            "but the capture manifest lists no files[] entry for it"
+        )
     if entry is not None and entry["status"] == "captured":
         notes.copies.append((relative, entry))
     return relative

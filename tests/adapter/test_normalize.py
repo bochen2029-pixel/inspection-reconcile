@@ -178,8 +178,8 @@ CONVERSIONS: list[tuple[str, FieldMap, Any, str | None, str | None]] = [
     ("text", fm("text"), "INS-001", "INS-001", None),
     ("text empty is null", fm("text"), "", None, None),
     ("text null", fm("text"), None, None, None),
-    ("text from a number", fm("text"), 5, "5", None),
-    ("text from an object", fm("text"), {"b": 1, "a": 2}, '{"a":2,"b":1}', None),
+    ("text from a number", fm("text"), 5, "5", "5"),
+    ("text from an object", fm("text"), {"b": 1, "a": 2}, '{"a":2,"b":1}', '{"a":2,"b":1}'),
     ("choice string", fm("text-multiple-choice", STATUS), "Complete", "completed", None),
     ("choice one-element list", fm("text-multiple-choice", STATUS), ["In Progress"], "in_progress", None),
     ("choice empty string", fm("text-multiple-choice", STATUS), "", None, None),
@@ -191,21 +191,21 @@ CONVERSIONS: list[tuple[str, FieldMap, Any, str | None, str | None]] = [
         fm("text-multiple-choice", STATUS),
         ["Complete", "x"],
         '["Complete","x"]',
-        None,
+        '["Complete","x"]',
     ),
-    ("choice number", fm("text-multiple-choice", STATUS), 3, "3", None),
+    ("choice number", fm("text-multiple-choice", STATUS), 3, "3", "3"),
     ("choice without a value map", fm("text-multiple-choice"), "Anything", "Anything", None),
     ("numeric integer", fm("numeric", as_="integer_string"), 2, "2", None),
     ("numeric integral float", fm("numeric", as_="integer_string"), 2.0, "2", None),
-    ("numeric fraction", fm("numeric", as_="integer_string"), 2.5, "2.5", None),
-    ("numeric boolean", fm("numeric", as_="integer_string"), True, "true", None),
-    ("numeric string", fm("numeric", as_="integer_string"), "2", '"2"', None),
+    ("numeric fraction", fm("numeric", as_="integer_string"), 2.5, "2.5", "2.5"),
+    ("numeric boolean", fm("numeric", as_="integer_string"), True, "true", "true"),
+    ("numeric string", fm("numeric", as_="integer_string"), "2", '"2"', '"2"'),
     ("checkbox true", fm("checkbox"), True, "true", None),
     ("checkbox false", fm("checkbox"), False, "false", None),
-    ("checkbox string", fm("checkbox"), "yes", '"yes"', None),
+    ("checkbox string", fm("checkbox"), "yes", '"yes"', '"yes"'),
     ("timestamp", fm("timestamp"), "2026-09-01T15:00:00Z", "2026-09-01T15:00:00Z", None),
     ("timestamp empty", fm("timestamp"), "", None, None),
-    ("timestamp number", fm("timestamp"), 20260901, "20260901", None),
+    ("timestamp number", fm("timestamp"), 20260901, "20260901", "20260901"),
     (
         "user email",
         fm("user", as_="email"),
@@ -213,13 +213,13 @@ CONVERSIONS: list[tuple[str, FieldMap, Any, str | None, str | None]] = [
         "reviewer@example.invalid",
         None,
     ),
-    ("user without email", fm("user", as_="email"), {"name": "R"}, '{"name":"R"}', None),
+    ("user without email", fm("user", as_="email"), {"name": "R"}, '{"name":"R"}', '{"name":"R"}'),
     (
         "user as a string",
         fm("user", as_="email"),
         "reviewer@example.invalid",
         '"reviewer@example.invalid"',
-        None,
+        '"reviewer@example.invalid"',
     ),
     ("recordid", fm("recordid"), 101, "101", None),
 ]
@@ -363,15 +363,25 @@ def test_list_form_choices_and_integral_floats_normalize_like_s16(tmp_path: Path
     assert run(out).assessment_semantic_sha256 == ss.run_scenario("S01-clean").assessment_semantic_sha256
 
 
-def test_a_wrong_json_type_becomes_an_invalid_cell(tmp_path: Path, mapping: Mapping) -> None:
+def test_a_wrong_json_type_is_listed_as_unmapped(tmp_path: Path, mapping: Mapping) -> None:
+    """AM-7: the cell holds the value's canonical JSON text, normalization.json lists it, and R0 reports
+    UNMAPPED_VALUE only (§22.3 exclusive classification), whatever the column grammar says."""
     export = copy_export(tmp_path)
     edit_record(export, "inspections", 107, 8, "yes")  # a checkbox holding a string
     out = tmp_path / "snapshot"
     normalize(export, mapping, out)
     rows = {r["inspection_id"]: r for r in read_csv_rows(out / "inspections.csv")}
     assert rows["INS-007"]["is_current"] == '"yes"'
-    finding = {f.key: f for f in run(out).findings}["R0:inspection:INS-007@1#INVALID_VALUE"]
-    assert finding.outcome == "UNKNOWN"
+    norm = json.loads((out / "normalization.json").read_text(encoding="utf-8"))
+    assert {
+        "dataset": "inspections",
+        "source": "table=bsyn00002;rid=107",
+        "field": "is_current",
+        "raw": '"yes"',
+    } in norm["unmapped_values"]
+    findings = {f.key: f for f in run(out).findings}
+    assert findings["R0:inspection:INS-007@1#UNMAPPED_VALUE"].outcome == "UNKNOWN"
+    assert "R0:inspection:INS-007@1#INVALID_VALUE" not in findings
 
 
 def test_file_names_are_sanitized_and_the_original_kept(tmp_path: Path, mapping: Mapping) -> None:
