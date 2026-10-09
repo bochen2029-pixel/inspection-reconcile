@@ -229,6 +229,8 @@ def cover(meta: dict[str, str], when: dt.date) -> str:
         ("Date", f"{when.day} {when.strftime('%B %Y')}"),
         ("Audience", meta["audience"]),
         ("Repository", REPO_URL.removeprefix("https://")),
+        ("Live demo", "bochen2029-pixel.github.io/inspection-reconcile"),
+        ("Project page", "opnaorta.ai/inspection-reconcile"),
     ]
     meta_rows = "".join(f"<dt>{html.escape(k)}</dt><dd>{html.escape(v)}</dd>" for k, v in rows)
     return (

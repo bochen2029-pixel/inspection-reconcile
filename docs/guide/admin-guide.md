@@ -127,6 +127,11 @@ uv run inspection-reconcile --version                         # inspection-recon
 uv run inspection-reconcile demo --all --out out/demo         # exit 0: all 24 scenarios match their oracle
 ```
 
+On the reference workstation, `demo --all` finishes in about 5 seconds, and a single assessment such as S02, with
+its 207 findings, in under half a second. The same reports are published at
+[bochen2029-pixel.github.io/inspection-reconcile](https://bochen2029-pixel.github.io/inspection-reconcile/), and the
+project page is [opnaorta.ai/inspection-reconcile](https://opnaorta.ai/inspection-reconcile).
+
 With the development extras installed, the full gate is the same one CI runs:
 
 ```bash
@@ -648,8 +653,9 @@ as markup. It contains no JavaScript and loads no external resources. A Content-
 - Nothing is written outside `--out`, and every file is written atomically: to a temporary name, flushed, then
   renamed.
 - An existing output is protected unless `--force` is given. Even then, only the command's own output names are
-  replaced: `assess` and `demo` replace their reports, and `normalize` and `capture-quickbase` replace a previous
-  output of their own.
+  replaced. `assess` and `demo` delete their previous reports and write the new ones. `normalize` and
+  `capture-quickbase` build the new output in a staging folder inside `--out` and swap it in all-or-nothing, only
+  after the run succeeded, so a failed run leaves the previous output exactly as it was.
 - If a write fails, the files and folders this run created are removed.
 
 ### Data handling

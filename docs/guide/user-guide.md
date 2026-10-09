@@ -125,6 +125,7 @@ Start with S02, the classic case: one inspection was never recorded.
 > The same reports are published online at
 > [bochen2029-pixel.github.io/inspection-reconcile](https://bochen2029-pixel.github.io/inspection-reconcile/),
 > rebuilt from the main branch after every successful test run, so you can browse them before installing anything.
+> The project page, [opnaorta.ai/inspection-reconcile](https://opnaorta.ai/inspection-reconcile), gives an overview.
 
 ## Key ideas
 
