@@ -14,6 +14,7 @@
 - **Precedence.** Where code and this document disagree, this document wins until it is amended. A disagreement is recorded in `docs/decisions.md` with a proposed amendment; it is never resolved silently in code.
 - **Oracles.** Appendix A (the scenario oracle) and Appendix B (digest vectors) are acceptance oracles. They were derived from this text, not from code. Tests MUST NOT regenerate them from the implementation. The implementation MUST NOT edit them to make a test pass. An oracle may change only through a spec amendment that states which semantic rule forced the change.
 - **Build order** is §16. Every step ends at a demonstrable, green checkpoint.
+- **Amendments.** §22 holds every normative change adopted during the build. Read it with the section it amends: where they differ, §22 wins.
 
 | part | sections | answers |
 |---|---|---|
@@ -25,6 +26,7 @@
 | Build | 13–16 | architecture, fixtures, tests, phased plan and the machine rules |
 | Guardrails | 17–21 | security, claims, extensions, open questions, sources |
 | Appendices | A–G | oracle, vectors, glossary, test-app blueprint, native parity, repository `CLAUDE.md`, SQL |
+| Amendments | 22 | normative changes adopted during the build, each with its decision |
 
 ---
 
@@ -2117,9 +2119,21 @@ The test also runs over S23, where the duplicate query must return exactly `INS-
 
 ---
 
-## 22 · Amendment AM-1 (normative)
+## 22 · Amendments (normative)
 
-Adopted on 2026-10-09 from an independent re-derivation of Appendix A (decision D-003). That re-derivation found no oracle errors; these amendments define values and orders the oracle relied on implicitly. Where this section and an earlier section differ, this section wins.
+Every change adopted after v3.0 is recorded here, each with its decision in `docs/decisions.md`. Where an amendment and an earlier section differ, the amendment wins. Among amendments, the later one wins.
+
+| amendment | sections | decision | source |
+|---|---|---|---|
+| AM-1 | §22.1–§22.7 | D-003 | an independent re-derivation of Appendix A |
+| AM-2 | §22.8 | D-004 | a rule-level test |
+| AM-3 | §22.9 | D-007 | implementing B1/B2 |
+| AM-4 | §22.10 | D-008, D-010, D-013 | implementing C2, the skip fallback and the streamed download |
+| AM-5 | §22.11 | D-009 | a spec-only engine review |
+| AM-6 | §22.12 | D-011 | preparing C3 |
+| AM-7 | §22.13 | D-012 | a spec-only adapter review |
+
+AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
 ### 22.1 `expected` and `observed`
 
