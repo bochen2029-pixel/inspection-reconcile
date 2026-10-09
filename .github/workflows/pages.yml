@@ -1,0 +1,59 @@
+name: pages
+
+# Publishes `demo --all` (the engine's own outputs for the synthetic North Creek scenarios) to GitHub Pages
+# (SPEC §16.3 step D1). It deploys only a commit of main whose ci workflow passed on a push, and `demo --all`
+# itself fails the build if any scenario departs from its oracle. No credentials are involved, and the build job
+# can only read the repository.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0 (no floating major tag since v8)
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: uv sync --frozen
+      # --out stays inside the checkout, so every path in the published run manifests is repository-relative.
+      - name: Demo (every scenario against its oracle; any mismatch fails the build)
+        run: uv run inspection-reconcile demo --all --out site
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

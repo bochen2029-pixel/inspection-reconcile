@@ -8,6 +8,9 @@
 > Compare the work a project requires with the inspection records, documents and approvals actually captured.
 > Explain every gap with its source evidence, and never report "ready" on evidence the tool could not see.
 
+**Live demo:** [all 24 scenario reports](https://bochen2029-pixel.github.io/inspection-reconcile/), rebuilt by CI
+from `main` after every green run.
+
 `inspection-reconcile` is a small, deterministic Python command-line tool. It decides whether a project's
 inspection documentation package is **ready for review** under an explicit, versioned requirement pack.
 
