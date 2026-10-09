@@ -156,6 +156,10 @@ _DBID_RE = re.compile(r"[A-Za-z0-9]{1,64}")
 _TOKEN_RE = re.compile(r"[\x21-\x7e]{1,512}")
 _ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
 _USER_ID_RE = re.compile(r"[0-9]{1,20}\.[A-Za-z0-9]{1,16}")
+_FIELD_KEY_RE = re.compile(r"[1-9][0-9]{0,9}")
+# Failures in which Quickbase answered and created nothing. After any other failure of createApp (a 5xx, a lost
+# connection, an unreadable 2xx, Ctrl+C in flight) an app may exist without the build knowing its id.
+REFUSED = frozenset({"QB_HTTP_ERROR", "QB_PERMISSION", "QB_RATE_LIMITED", "QB_REDIRECT", "NOT_ALLOWED"})
 
 
 class BuildError(RunError):
@@ -296,6 +300,8 @@ class BuilderClient:
         for value in [*params.values(), *(path or {}).values()]:
             if not isinstance(value, str) or _DBID_RE.fullmatch(value) is None:
                 raise AllowlistError(f"{operation}: {value!r} is not a Quickbase id")
+        if operation == "upsert" and not only_adds(body):
+            raise AllowlistError("upsert only adds records: no mergeFieldId and no Record ID#")
         url = BASE_URL + template.format(**(path or {}))
         attempt = 0
         while True:
@@ -396,6 +402,19 @@ class BuilderClient:
 
     def _redact(self, text: str) -> str:
         return redact(text, self._token)
+
+
+def only_adds(body: Any) -> bool:
+    """Whether an upsert body can only add records. upsert also updates: a data item that carries the table's
+    key field (Record ID#, field 3, on every table this run creates) or a mergeFieldId (OpenAPI upsert) turns
+    an add into an update. Every field key must be a plain field id other than 3."""
+    if not isinstance(body, dict) or "mergeFieldId" in body or not isinstance(body.get("data"), list):
+        return False
+    return all(
+        isinstance(item, dict)
+        and all(isinstance(key, str) and _FIELD_KEY_RE.fullmatch(key) and key != "3" for key in item)
+        for item in body["data"]
+    )
 
 
 # ------------------------------------------------------------------------------------------------ the ledger
@@ -509,6 +528,11 @@ def create_schema(
         table_id = _string(created, "id", "createTable")
         ledger.tables[table.role] = table_id
         ledger.fields[table.role] = {}
+        key_fid = created.get("keyFieldId", 3)  # OpenAPI: "usually the Quickbase Record ID"
+        if key_fid != 3:  # upsert updates on the key field, and only_adds() refuses field 3 only
+            raise BuildError(
+                "QB_UNEXPECTED", f"{table.name}: the key field is {key_fid!r}, not Record ID# (3)"
+            )
         made = []
         for fp in table.fields:
             if fp.type == "reference":
@@ -811,6 +835,9 @@ def main(
     except RunError as exc:
         print(f"error: {exc.code}: {redact(exc.message, token)}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:  # before createApp; once it is sent, build() reports what may exist
+        print("error: INTERRUPTED: stopped by Ctrl+C before anything was created", file=sys.stderr)
+        return 2
     except Exception as exc:  # a defect here must not print a traceback, or anything holding the token
         print(f"error: INTERNAL: {type(exc).__name__}: {redact(str(exc), token)}", file=sys.stderr)
         return 2
@@ -897,8 +924,20 @@ def build(
         for path, text in zip(outputs, (mapping_text, config_text), strict=True):
             write_files(path.parent, {path.name: text.encode("utf-8")})
     except (Exception, KeyboardInterrupt) as exc:
-        if ledger.app_id is None:
-            raise
+        if ledger.app_id is None:  # createApp itself failed: say when an app may exist anyway
+            if isinstance(exc, RunError) and exc.code in REFUSED:
+                raise
+            if isinstance(exc, RunError):
+                code, detail = exc.code, exc.message
+            elif isinstance(exc, KeyboardInterrupt):
+                code, detail = "INTERRUPTED", "interrupted while createApp was in flight"
+            else:
+                code, detail = "INTERNAL", type(exc).__name__
+            raise BuildError(
+                code,
+                f"{detail}. An app named {app_name!r} may have been created in {args.realm}; "
+                "check for it before running again.",
+            ) from None
         reason = f"{exc.code}: {exc.message}" if isinstance(exc, RunError) else type(exc).__name__
         raise BuildError(
             "BUILD_INCOMPLETE",

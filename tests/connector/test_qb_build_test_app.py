@@ -87,10 +87,11 @@ class FakeRealm(MockApp):
     """A tiny Quickbase realm: createApp, createTable, createField, createRelationship and upsert, checked against
     the OpenAPI shapes and the field-type write formats, plus MockApp's reads over the stored state."""
 
-    def __init__(self, first_fid: int = 6) -> None:
+    def __init__(self, first_fid: int = 6, key_field: int = 3) -> None:
         super().__init__()
         self.fields, self.records = {}, {}
         self.first_fid = first_fid  # > 6: new tables come with pre-existing fields, so the demo ids shift
+        self.key_field = key_field  # what createTable reports as keyFieldId
         self.apps: dict[str, dict[str, Any]] = {}
         self.tables: dict[str, dict[str, Any]] = {}
         self.references: dict[tuple[str, int], str] = {}  # (child table, field id) -> parent table
@@ -161,7 +162,15 @@ class FakeRealm(MockApp):
             field(fid, f"Pre-existing {fid}", "text") for fid in range(6, self.first_fid)
         ]
         self.records[table_id] = []
-        return httpx.Response(200, json={"id": table_id, "name": body["name"], "nextFieldId": self.first_fid})
+        return httpx.Response(
+            200,
+            json={
+                "id": table_id,
+                "name": body["name"],
+                "nextFieldId": self.first_fid,
+                "keyFieldId": self.key_field,
+            },
+        )
 
     def _new_field(self, table_id: str, label: str, kind: str, properties: dict[str, Any]) -> dict[str, Any]:
         fid = self.tables[table_id]["next_fid"]
@@ -404,6 +413,7 @@ def test_build_capture_normalize_assess_gives_the_s01_findings(tmp_path: Path, c
     s01 = ss.run_scenario("S01-clean")
     assert result.status == "READY_FOR_REVIEW"
     assert triples(result) == triples(s01)
+    assert ss.mismatches("S01-clean", result) == []  # and the hand-written oracle, not only the engine
 
 
 def test_real_field_ids_that_differ_from_the_demo_go_into_the_live_mapping(
@@ -421,6 +431,7 @@ def test_real_field_ids_that_differ_from_the_demo_go_into_the_live_mapping(
     result = capture_and_assess(realm, tmp_path)
     assert result.status == "READY_FOR_REVIEW"
     assert triples(result) == triples(ss.run_scenario("S01-clean"))
+    assert ss.mismatches("S01-clean", result) == []
 
 
 def test_the_plan_is_appendix_d_in_the_order_that_gives_the_demo_field_ids() -> None:
@@ -571,6 +582,69 @@ def test_ids_that_did_not_come_from_this_run_are_refused_before_any_io() -> None
     with pytest.raises(qb.AllowlistError, match="obligations"):
         qb.create_schema(client, plan[1:2], ledger, lambda line: None)
     assert not any("relationship" in r.url.path for r in realm.requests)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"to": "bt0000001", "data": [{"6": {"value": "O-001"}}], "mergeFieldId": 6},
+        {
+            "to": "bt0000001",
+            "data": [{"6": {"value": "O-001"}}, {"3": {"value": 1}, "6": {"value": "O-002"}}],
+        },
+        {"to": "bt0000001", "data": [{"03": {"value": 1}, "6": {"value": "O-002"}}]},
+    ],
+    ids=["mergeFieldId", "Record ID#", "Record ID# spelled 03"],
+)
+def test_an_upsert_that_could_update_a_record_is_refused_before_any_io(body: dict[str, Any]) -> None:
+    """upsert adds or updates. It updates on the key field (Record ID#, field 3), or on mergeFieldId."""
+    realm = FakeRealm()
+    client = qb.BuilderClient(REALM, TOKEN, transport=httpx.MockTransport(realm))
+    with pytest.raises(
+        qb.AllowlistError, match="upsert only adds records: no mergeFieldId and no Record ID#"
+    ):
+        client.call("upsert", body=body)
+    assert realm.requests == [] and client.requests == 0
+
+
+def test_a_table_whose_key_field_is_not_record_id_stops_the_build(tmp_path: Path, capsys: Any) -> None:
+    realm = FakeRealm(key_field=6)  # upsert would merge on field 6, which the add-only check does not refuse
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    err = capsys.readouterr().err
+    assert "BUILD_INCOMPLETE: QB_UNEXPECTED: Obligations: the key field is 6, not Record ID# (3)" in err
+    assert not any(r.url.path in ("/v1/fields", "/v1/records") for r in realm.requests)
+
+
+@pytest.mark.parametrize(
+    ("failure", "may_exist"),
+    [(502, True), ("timeout", True), ("ctrl-c", True), ("unreadable", True), (400, False)],
+)
+def test_a_failed_create_app_says_whether_an_app_may_already_exist(
+    tmp_path: Path, capsys: Any, failure: Any, may_exist: bool
+) -> None:
+    realm = FakeRealm()
+
+    def fail(request: httpx.Request, body: Any) -> httpx.Response | None:
+        if request.url.path != "/v1/apps":
+            return None
+        if failure == "timeout":
+            raise httpx.ReadTimeout("no answer", request=request)
+        if failure == "ctrl-c":
+            raise KeyboardInterrupt
+        if failure == "unreadable":
+            return httpx.Response(200, content=b"<html>created</html>")
+        return httpx.Response(failure, json={"message": "nope"})
+
+    realm.hooks.append(fail)
+    assert run_builder(realm, tmp_path, "--yes") == 2
+    err = capsys.readouterr().err
+    sentence = (
+        f"An app named 'inspection-reconcile C3 test 2026-10-01 18:00 UTC' may have been created in {REALM}; "
+        "check for it before running again."
+    )
+    assert (sentence in err) is may_exist, err
+    assert len(realm.requests) == 1  # createApp is never repeated
+    assert not (tmp_path / "local").exists()
 
 
 # -- 429, failed writes, refused records, redirects, the rate limit --------------------------------------------
