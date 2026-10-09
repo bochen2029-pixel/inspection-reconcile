@@ -60,6 +60,7 @@ class MockApp:
         self.short_pages: dict[tuple[str, int], int] = {}
         self.total_bias: dict[tuple[str, int], int] = {}
         self.drop_field: dict[str, int] = {}
+        self.refuse_gt = False  # a source that rejects the {3.GT.n} comparison (SPEC §12.1, unverified)
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -81,7 +82,11 @@ class MockApp:
 
     def _query(self, body: dict[str, Any]) -> httpx.Response:
         table_id, select, top = body["from"], body["select"], body["options"]["top"]
-        conditions = re.findall(r"\{(\d+)\.(EX|GT)\.([^}]*)\}", body["where"])
+        skip = body["options"].get("skip", 0)
+        where = body.get("where") or ""
+        if self.refuse_gt and ".GT." in where:
+            return httpx.Response(400, json={"message": "Bad Request", "description": "Invalid query"})
+        conditions = re.findall(r"\{(\d+)\.(EX|GT)\.([^}]*)\}", where)
 
         def matches(record: dict[str, Any]) -> bool:
             for fid, op, value in conditions:
@@ -94,7 +99,7 @@ class MockApp:
 
         hits = sorted((r for r in self.records[table_id] if matches(r)), key=lambda r: r["3"]["value"])
         n = self.query_count[table_id] = self.query_count.get(table_id, 0) + 1
-        page = hits[: min(top, self.short_pages.get((table_id, n), top))]
+        page = hits[skip : skip + min(top, self.short_pages.get((table_id, n), top))]
         labels = {f["id"]: f for f in self.fields[table_id]}
         shown = [fid for fid in select if self.drop_field.get(table_id) != fid]
         return httpx.Response(
@@ -600,3 +605,111 @@ def test_the_output_directory_must_be_absent_or_empty(
     with pytest.raises(RunError) as info:
         run_capture(client, mapping, out)
     assert info.value.code == "OUT_NOT_EMPTY"
+
+
+# -- SPEC §12.1: skip paging when the source refuses {3.GT.n} --------------------------------------------------
+
+
+def test_a_refused_keyset_comparison_falls_back_to_skip_paging(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    export = tmp_path / "export"
+    manifest = run_capture(client, mapping, export)
+    assert {t["paging"] for t in manifest["tables"].values()} == {"skip"}
+    assert all(t["two_pass"] == "stable" for t in manifest["tables"].values())
+    assert manifest["datasets"]["inspections"]["coverage"] == "complete_for_declared_scope"
+    accepted = [q for q in app.queries if ".GT." not in (q.get("where") or "")]
+    obligations = [q for q in accepted if q["from"] == "bsyn00001" and q["select"] != [2, 3]]
+    assert [q["options"]["skip"] for q in obligations] == [0, 15, 30, 40]
+    assert {q["where"] for q in obligations} == {"{7.EX.'NC-001'}"}
+    assert all("where" not in q for q in accepted if q["from"] == "bsyn00003")
+    result = assess_export(export, mapping, tmp_path)
+    assert result.status == "READY_FOR_REVIEW"
+    assert triples(result) == triples(ss.run_scenario("S01-clean"))
+
+
+def test_skip_paging_detects_an_insert_during_the_read(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    extra = json.loads(json.dumps(app.records["bsyn00002"][0]))
+    extra.update({"3": {"value": 150}, "6": {"value": "INS-950"}})
+    state = {"skip_pages": 0}
+
+    def insert_after_first_page(request: httpx.Request, body: Any) -> None:
+        if body and body.get("from") == "bsyn00002" and "where" not in body and body["select"] != [2, 3]:
+            state["skip_pages"] += 1
+            if state["skip_pages"] == 2:
+                app.records["bsyn00002"].append(extra)
+        return None
+
+    app.hooks.append(insert_after_first_page)
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    assert manifest["tables"]["inspections"]["paging"] == "skip"
+    assert manifest["tables"]["inspections"]["two_pass"] == "changed"
+    assert manifest["datasets"]["inspections"] == {
+        "coverage": "partial",
+        "basis": ["pagination_incomplete"],
+        "consistency": "changed_during_capture",
+    }
+
+
+def test_skip_paging_detects_a_delete_during_the_read(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    state = {"skip_pages": 0}
+
+    def delete_after_first_page(request: httpx.Request, body: Any) -> None:
+        if body and body.get("from") == "bsyn00002" and "where" not in body and body["select"] != [2, 3]:
+            state["skip_pages"] += 1
+            if state["skip_pages"] == 2:  # a record already read disappears: later offsets shift
+                app.records["bsyn00002"] = [r for r in app.records["bsyn00002"] if r["3"]["value"] != 101]
+        return None
+
+    app.hooks.append(delete_after_first_page)
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    assert manifest["tables"]["inspections"]["paging"] == "skip"
+    assert manifest["datasets"]["inspections"] == {
+        "coverage": "partial",
+        "basis": ["pagination_incomplete"],
+        "consistency": "changed_during_capture",
+    }
+
+
+def test_skip_paging_reads_through_short_intelligent_pages(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    app.short_pages[("bsyn00002", 2)] = 7  # the refused keyset query is not counted by the mock
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    inspections = manifest["tables"]["inspections"]
+    assert (inspections["paging"], inspections["pages"], inspections["retrieved"]) == ("skip", 5, 40)
+    skips = [
+        q["options"]["skip"]
+        for q in app.queries
+        if q["from"] == "bsyn00002" and "where" not in q and q["select"] != [2, 3]
+    ]
+    assert skips == [0, 15, 22, 37, 40]
+    assert manifest["datasets"]["inspections"]["coverage"] == "complete_for_declared_scope"
+
+
+def test_a_refusal_after_the_first_page_is_a_run_error(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.hooks.append(
+        lambda request, body: (
+            httpx.Response(400, json={"message": "Bad Request"})
+            if body and body.get("where") == "{7.EX.'NC-001'}AND{3.GT.15}"
+            else None
+        )
+    )
+    with pytest.raises(RunError) as info:
+        run_capture(client, mapping, tmp_path / "export")
+    assert info.value.code == "QB_HTTP_ERROR"
+
+
+def test_keyset_is_recorded_when_it_works(tmp_path: Path, client: QuickbaseClient, mapping: Mapping) -> None:
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    assert {t["paging"] for t in manifest["tables"].values()} == {"keyset"}
