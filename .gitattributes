@@ -1,0 +1,5 @@
+* text=auto eol=lf
+fixtures/** -text
+*.pdf binary
+*.png binary
+*.sqlite binary

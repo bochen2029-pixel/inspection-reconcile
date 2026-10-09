@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspection-reconcile"
+dynamic = ["version"]
+description = "Deterministic documentation-readiness checking for inspection records, with a read-only Quickbase adapter."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [{ name = "Bo Chen" }]
+dependencies = [
+    "PyYAML>=6.0.1,<7",
+    "Jinja2>=3.1.4,<4",
+]
+
+[project.optional-dependencies]
+quickbase = ["httpx>=0.27,<1"]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML",
+]
+
+[project.scripts]
+inspection-reconcile = "inspection_reconcile.cli:main"
+
+[tool.hatch.version]
+path = "src/inspection_reconcile/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspection_reconcile"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "scenario: end-to-end scenario tests against fixtures/oracle.yaml",
+    "slow: property-based and cross-scenario tests",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["fixtures", "out", "local", "docs", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/inspection_reconcile"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "inspection_reconcile.canonical",
+    "inspection_reconcile.grammar",
+    "inspection_reconcile.engine.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+warn_return_any = true

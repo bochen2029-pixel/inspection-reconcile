@@ -1,0 +1,204 @@
+oracle_version: 3
+expansion: "A token NNN..MMM inside a key expands to every zero-padded integer in [NNN, MMM]; '{id}' in blocked_by or caused_by is replaced by the subject id of the expanded key."
+scenarios:
+  S01-clean:
+    status: READY_FOR_REVIEW
+    obligations: 40
+    non_pass: []
+    counts: {PASS: 207, FAIL: 0, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S02-missing-inspection:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R2:obligation:O-017", outcome: FAIL, reason: NO_CURRENT_INSPECTION}
+      - {key: "R3:obligation:O-017", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-017"]}
+      - {key: "R4:obligation:O-017", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-017"]}
+      - {key: "R5:obligation:O-017", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-017"]}
+      - {key: "R6:obligation:O-017", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-017", "R5:obligation:O-017"]}
+    counts: {PASS: 202, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 4}
+  S03-wrong-project-evidence:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R3:obligation:O-023", outcome: FAIL, reason: ARTIFACT_PROJECT_MISMATCH}
+      - {key: "R4:obligation:O-023", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-023"]}
+      - {key: "R5:obligation:O-023", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-023"]}
+      - {key: "R6:obligation:O-023", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-023", "R5:obligation:O-023"]}
+    counts: {PASS: 203, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 3}
+  S04-revised-evidence:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R6:obligation:O-031", outcome: FAIL, reason: EVIDENCE_CHANGED_SINCE_APPROVAL}
+    counts: {PASS: 206, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S05-incomplete-capture:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R1:dataset:inspections", outcome: UNKNOWN, reason: COVERAGE_PARTIAL}
+      - {key: "R1:dataset:artifacts", outcome: UNKNOWN, reason: COVERAGE_PARTIAL}
+      - {key: "R1:dataset:approvals", outcome: UNKNOWN, reason: COVERAGE_PARTIAL}
+      - {key: "R1:dataset:evidence_files", outcome: UNKNOWN, reason: COVERAGE_PARTIAL}
+      - {key: "R2:obligation:O-001..036", outcome: UNKNOWN, reason: CARDINALITY_UNCONFIRMED, caused_by: ["R1:dataset:inspections"]}
+      - {key: "R3:obligation:O-001..036", outcome: UNKNOWN, reason: IDENTITY_UNCONFIRMED, caused_by: ["R1:dataset:artifacts"]}
+      - {key: "R5:obligation:O-001..036", outcome: UNKNOWN, reason: AVAILABILITY_UNCONFIRMED, caused_by: ["R1:dataset:artifacts"]}
+      - {key: "R6:obligation:O-001..036", outcome: NOT_EVALUATED, blocked_by: ["R5:obligation:{id}"]}
+      - {key: "R2:obligation:O-037..040", outcome: UNKNOWN, reason: ABSENCE_UNCONFIRMED, caused_by: ["R1:dataset:inspections"]}
+      - {key: "R3:obligation:O-037..040", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:{id}"]}
+      - {key: "R4:obligation:O-037..040", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:{id}"]}
+      - {key: "R5:obligation:O-037..040", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:{id}"]}
+      - {key: "R6:obligation:O-037..040", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:{id}", "R5:obligation:{id}"]}
+    counts: {PASS: 39, FAIL: 0, UNKNOWN: 116, NOT_EVALUATED: 52}
+  S06-corrected:
+    status: READY_FOR_REVIEW
+    obligations: 40
+    non_pass: []
+    counts: {PASS: 207, FAIL: 0, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S07-duplicate-current:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R2:obligation:O-012", outcome: FAIL, reason: MULTIPLE_CURRENT}
+      - {key: "R3:obligation:O-012", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-012"]}
+      - {key: "R4:obligation:O-012", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-012"]}
+      - {key: "R5:obligation:O-012", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-012"]}
+      - {key: "R6:obligation:O-012", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-012", "R5:obligation:O-012"]}
+    counts: {PASS: 202, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 4}
+  S08-silent-byte-change:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R6:obligation:O-009", outcome: FAIL, reason: EVIDENCE_CHANGED_SINCE_APPROVAL}
+    counts: {PASS: 206, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S09-missing-file:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R5:obligation:O-014", outcome: FAIL, reason: FILE_ABSENT}
+      - {key: "R6:obligation:O-014", outcome: NOT_EVALUATED, blocked_by: ["R5:obligation:O-014"]}
+    counts: {PASS: 205, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 1}
+  S10-missing-document:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R4:obligation:O-027", outcome: FAIL, reason: KIND_MISSING}
+      - {key: "R6:obligation:O-027", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-027"]}
+    counts: {PASS: 205, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 1}
+  S11-no-scope:
+    status: UNKNOWN
+    obligations: 0
+    non_pass:
+      - {key: "R1:project:NC-001", outcome: UNKNOWN, reason: SCOPE_MISSING}
+      - {key: "R7:snapshot:all", outcome: NOT_EVALUATED, blocked_by: ["R1:project:NC-001"]}
+    counts: {PASS: 5, FAIL: 0, UNKNOWN: 1, NOT_EVALUATED: 1}
+  S12-attachment-not-captured:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R1:dataset:evidence_files", outcome: UNKNOWN, reason: COVERAGE_PARTIAL}
+      - {key: "R5:obligation:O-019", outcome: UNKNOWN, reason: NOT_CAPTURED, caused_by: ["R1:dataset:evidence_files"]}
+      - {key: "R6:obligation:O-019", outcome: NOT_EVALUATED, blocked_by: ["R5:obligation:O-019"]}
+    counts: {PASS: 204, FAIL: 0, UNKNOWN: 2, NOT_EVALUATED: 1}
+  S13-conflicting-current-revisions:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R0:artifact:ART-033-P#MULTIPLE_CURRENT_REVISIONS", outcome: FAIL, reason: MULTIPLE_CURRENT_REVISIONS}
+      - {key: "R2:obligation:O-033", outcome: NOT_EVALUATED, blocked_by: ["R0:artifact:ART-033-P#MULTIPLE_CURRENT_REVISIONS"]}
+      - {key: "R3:obligation:O-033", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-033"]}
+      - {key: "R4:obligation:O-033", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-033"]}
+      - {key: "R5:obligation:O-033", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-033"]}
+      - {key: "R6:obligation:O-033", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-033", "R5:obligation:O-033"]}
+    counts: {PASS: 201, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 5}
+  S14-revoked-approval:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R6:obligation:O-021", outcome: FAIL, reason: APPROVAL_REVOKED}
+    counts: {PASS: 206, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S15-out-of-scope-record:
+    status: READY_FOR_REVIEW
+    obligations: 40
+    non_pass:
+      - {key: "R7:inspection:INS-099", outcome: FAIL, reason: UNMATCHED_INSPECTION}
+    counts: {PASS: 206, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S16-quickbase-clean:
+    status: READY_FOR_REVIEW
+    obligations: 40
+    equivalent_to: S01-clean
+    non_pass: []
+    counts: {PASS: 207, FAIL: 0, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S17-quickbase-unmapped-value:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R0:inspection:INS-006@1#UNMAPPED_VALUE", outcome: UNKNOWN, reason: UNMAPPED_VALUE}
+      - {key: "R2:obligation:O-006", outcome: NOT_EVALUATED, blocked_by: ["R0:inspection:INS-006@1#UNMAPPED_VALUE"]}
+      - {key: "R3:obligation:O-006", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-006"]}
+      - {key: "R4:obligation:O-006", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-006"]}
+      - {key: "R5:obligation:O-006", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-006"]}
+      - {key: "R6:obligation:O-006", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-006", "R5:obligation:O-006"]}
+    counts: {PASS: 201, FAIL: 0, UNKNOWN: 1, NOT_EVALUATED: 5}
+  S18-revision-binding:
+    status: BLOCKED
+    obligations: 40
+    policy: north-creek-revisions
+    non_pass:
+      - {key: "R6:obligation:O-031", outcome: FAIL, reason: EVIDENCE_CHANGED_SINCE_APPROVAL}
+    counts: {PASS: 206, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 0}
+  S19-binding-strength-insufficient:
+    status: UNKNOWN
+    obligations: 40
+    fixture: S18-revision-binding
+    non_pass:
+      - {key: "R6:obligation:O-001..040", outcome: UNKNOWN, reason: BINDING_STRENGTH_INSUFFICIENT}
+    counts: {PASS: 167, FAIL: 0, UNKNOWN: 40, NOT_EVALUATED: 0}
+  S20-dangling-reference:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R0:approval:APR-777#DANGLING_REFERENCE", outcome: UNKNOWN, reason: DANGLING_REFERENCE, required: false}
+      - {key: "R1:dataset:inspections", outcome: UNKNOWN, reason: COVERAGE_CONTRADICTED}
+      - {key: "R2:obligation:O-001..040", outcome: UNKNOWN, reason: CARDINALITY_UNCONFIRMED, caused_by: ["R1:dataset:inspections"]}
+    counts: {PASS: 165, FAIL: 0, UNKNOWN: 42, NOT_EVALUATED: 0}
+  S21-invalid-path:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R0:artifact:ART-005-R@1#INVALID_PATH", outcome: UNKNOWN, reason: INVALID_PATH}
+      - {key: "R2:obligation:O-005", outcome: NOT_EVALUATED, blocked_by: ["R0:artifact:ART-005-R@1#INVALID_PATH"]}
+      - {key: "R3:obligation:O-005", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-005"]}
+      - {key: "R4:obligation:O-005", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-005"]}
+      - {key: "R5:obligation:O-005", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-005"]}
+      - {key: "R6:obligation:O-005", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-005", "R5:obligation:O-005"]}
+    counts: {PASS: 201, FAIL: 0, UNKNOWN: 1, NOT_EVALUATED: 5}
+  S22-case-mismatch:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R5:obligation:O-008", outcome: FAIL, reason: FILE_ABSENT}
+      - {key: "R6:obligation:O-008", outcome: NOT_EVALUATED, blocked_by: ["R5:obligation:O-008"]}
+    counts: {PASS: 205, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 1}
+  S23-duplicate-key:
+    status: BLOCKED
+    obligations: 40
+    non_pass:
+      - {key: "R0:inspection:INS-004@1#DUPLICATE_KEY", outcome: FAIL, reason: DUPLICATE_KEY}
+      - {key: "R2:obligation:O-004", outcome: NOT_EVALUATED, blocked_by: ["R0:inspection:INS-004@1#DUPLICATE_KEY"]}
+      - {key: "R3:obligation:O-004", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:O-004"]}
+      - {key: "R4:obligation:O-004", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-004"]}
+      - {key: "R5:obligation:O-004", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:O-004"]}
+      - {key: "R6:obligation:O-004", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:O-004", "R5:obligation:O-004"]}
+    counts: {PASS: 201, FAIL: 1, UNKNOWN: 0, NOT_EVALUATED: 5}
+  S24-scope-not-accepted:
+    status: UNKNOWN
+    obligations: 40
+    non_pass:
+      - {key: "R1:project:NC-001", outcome: UNKNOWN, reason: SCOPE_NOT_ACCEPTED}
+      - {key: "R2:obligation:O-001..040", outcome: NOT_EVALUATED, blocked_by: ["R1:project:NC-001"]}
+      - {key: "R3:obligation:O-001..040", outcome: NOT_EVALUATED, blocked_by: ["R2:obligation:{id}"]}
+      - {key: "R4:obligation:O-001..040", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:{id}"]}
+      - {key: "R5:obligation:O-001..040", outcome: NOT_EVALUATED, blocked_by: ["R3:obligation:{id}"]}
+      - {key: "R6:obligation:O-001..040", outcome: NOT_EVALUATED, blocked_by: ["R4:obligation:{id}", "R5:obligation:{id}"]}
+      - {key: "R7:snapshot:all", outcome: NOT_EVALUATED, blocked_by: ["R1:project:NC-001"]}
+    counts: {PASS: 5, FAIL: 0, UNKNOWN: 1, NOT_EVALUATED: 201}
