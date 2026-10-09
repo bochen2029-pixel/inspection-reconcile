@@ -32,8 +32,15 @@ amendments AM-1 to AM-10 are in [docs/decisions.md](docs/decisions.md).
 - **Tested against a mock app** built to the published OpenAPI contract. It has not yet run against a live
   Quickbase app; [docs/c3-runbook.md](docs/c3-runbook.md) describes that step.
 
+### Documentation
+- **The guides.** A User Guide (35 pages) and an Administrator Guide (32 pages), as designed PDFs, Word documents
+  and Markdown sources, in [docs/guide/](docs/guide/). `tools/build_guides.py` rebuilds them.
+- **The guides are tested.** `tests/meta/test_guides.py` runs every annotated command in them and checks its exit
+  code. It also checks that every image exists, and that the run-error catalog matches the codes the package raises.
+- **Screenshots.** `tools/make_screenshots.py` regenerates every screenshot from the tool's own output.
+
 ### Verification
-- **Tests:** 817, with five fault injections and three properties (row-order invariance, idempotence and coverage
+- **Tests:** 824, with five fault injections and three properties (row-order invariance, idempotence and coverage
   monotonicity).
 - **CI:** Windows, macOS and Linux on Python 3.12 and 3.13, with a cross-platform identity comparison.
 - **Independent reviews:** separate passes re-derived the oracle and reviewed the engine, the adapters, the
