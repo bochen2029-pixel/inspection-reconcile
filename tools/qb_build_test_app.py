@@ -10,11 +10,13 @@ It then writes local/quickbase-live.yml (the real table and field ids) and local
 is just capture-quickbase, assess and compare.
 
 This is the only code in the repository that writes to Quickbase, and it only creates:
-- six operations are allowed, checked before any I/O: createApp, createTable, createField, createRelationship,
-  upsert and getFields. Nothing can update or delete;
-- every app, table, field and record id it sends came from a response in this same run, so it writes only into the
-  app it has just created;
-- a failure after createApp stops the build and names the app, for you to delete by hand. It never deletes.
+- six operations are allowed, checked by the client before any I/O: createApp, createTable, createField,
+  createRelationship, upsert and getFields. An upsert may only add records (no mergeFieldId, no Record ID#). Nothing
+  can update or delete;
+- every app, table, field and record id it sends came from a response in this same run (the optional
+  --decided-by-id user id excepted), so it writes only into the app it has just created;
+- a failure after createApp stops the build and names the app, for you to delete by hand. If createApp itself fails
+  after it was sent, the message says that an app may exist. It never deletes.
 
 The package never imports this file, so the read-only client and its allowlist (I-7) are unchanged. Request shapes
 follow Quickbase's OpenAPI document (operationIds cited below) and its "Field type details" page.
@@ -154,7 +156,7 @@ _HOSTNAME_RE = re.compile(
 )
 _DBID_RE = re.compile(r"[A-Za-z0-9]{1,64}")
 _TOKEN_RE = re.compile(r"[\x21-\x7e]{1,512}")
-_ENV_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+_ENV_NAME_RE = re.compile(r"[A-Z_][A-Z0-9_]{0,127}")  # capitals only: a user token is lowercase
 _USER_ID_RE = re.compile(r"[0-9]{1,20}\.[A-Za-z0-9]{1,16}")
 _FIELD_KEY_RE = re.compile(r"[1-9][0-9]{0,9}")
 # Failures in which Quickbase answered and created nothing. After any other failure of createApp (a 5xx, a lost
@@ -569,6 +571,11 @@ def create_schema(
                         "QB_UNEXPECTED",
                         f"{table.name}.{fp.label} was created as fieldType {actual!r}, not {body['fieldType']!r}",
                     )
+            if fid <= 5 or fid in ledger.fields[table.role].values():  # 1-5 are every table's built-ins
+                raise BuildError(
+                    "QB_UNEXPECTED",
+                    f"{table.name}.{fp.label}: Quickbase answered field id {fid}, not a new field",
+                )
             ledger.fields[table.role][fp.column] = fid
             made.append(f"{fid} {fp.label}")
         say(f"  {table.name}: table {table_id}; fields {', '.join(made)}")
@@ -660,6 +667,8 @@ def _check_upsert(response: Any, table: TablePlan, keys: list[str], key_fid: int
     # Reference values come from these record ids, matched by key, never assumed to be 1..N.
     if sorted(returned) != sorted(keys) or sorted(returned.values()) != sorted(created):
         raise BuildError("QB_PROTOCOL", f"{where}: the returned records do not match the records sent")
+    if set(returned) & set(ledger.records[table.role]):
+        raise BuildError("QB_PROTOCOL", f"{where}: a key came back in two batches")
     ledger.records[table.role].update(returned)
 
 
@@ -742,8 +751,8 @@ def capture_config_text(ledger: Ledger, token_env: str, accepted: Mapping[str, s
     )
 
 
-def check_outputs(ledger: Ledger, mapping_text: str, config_text: str) -> None:
-    """Both files must load with the package's own validators and carry exactly this run's ids."""
+def check_mapping(ledger: Ledger, mapping_text: str) -> FieldMapping:
+    """The live mapping, loaded with the package's own validator; it must carry exactly this run's ids."""
     live = parse_mapping(loads_yaml(mapping_text, "quickbase-live.yml"), "quickbase-live.yml")
     for role in REQUIRED_ROLES:
         table = live.tables[role]
@@ -755,6 +764,11 @@ def check_outputs(ledger: Ledger, mapping_text: str, config_text: str) -> None:
         "obligations", "project_id"
     ):
         raise BuildError("INTERNAL", "the live mapping's mapping_id or scope_filter is wrong")
+    return live
+
+
+def check_config(ledger: Ledger, config_text: str) -> None:
+    """The capture configuration, loaded with the package's own validator, must name this run's realm and app."""
     config = parse_capture_config(loads_yaml(config_text, "qb-capture.yml"), "qb-capture.yml")
     if (config.realm_hostname, config.app_id) != (ledger.realm, ledger.app()):
         raise BuildError("INTERNAL", "the capture configuration does not name this run's realm and app")
@@ -764,14 +778,23 @@ def check_outputs(ledger: Ledger, mapping_text: str, config_text: str) -> None:
 
 
 def read_token(args: argparse.Namespace, environ: Mapping[str, str]) -> tuple[str | None, str]:
-    """(token or None, where it comes from). The token is never taken from the command line."""
+    """(token or None, where it comes from). The token is never taken from the command line, and a name or path
+    that may be the token pasted in the wrong place is never shown: an environment variable name must be in
+    capitals (build() checks it before anything is printed), and a token file's path is shown only if it exists."""
     if args.token_file:
         path = Path(args.token_file)
+        if not path.is_file():
+            return (
+                None,
+                "the file given with --token-file, which does not exist (path not shown: it may be the token)",
+            )
         source = f"the file {path.as_posix()}"
         try:
-            token = path.read_text(encoding="utf-8").strip()
-        except (OSError, UnicodeDecodeError):
-            return None, source
+            token = path.read_text(encoding="utf-8-sig").strip()  # a BOM from a Windows editor is fine
+        except UnicodeDecodeError:
+            return None, f"{source}, which is not UTF-8 text"
+        except OSError as exc:
+            return None, f"{source}, which cannot be read ({exc.strerror or type(exc).__name__})"
         return token or None, source
     return environ.get(args.token_env) or None, f"the environment variable {args.token_env}"
 
@@ -835,9 +858,9 @@ def main(
     except RunError as exc:
         print(f"error: {exc.code}: {redact(exc.message, token)}", file=sys.stderr)
         return 2
-    except KeyboardInterrupt:  # before createApp; once it is sent, build() reports what may exist
-        print("error: INTERRUPTED: stopped by Ctrl+C before anything was created", file=sys.stderr)
-        return 2
+    except KeyboardInterrupt:  # from the createApp send on, build() itself reports what may exist
+        print("error: INTERRUPTED: stopped by Ctrl+C", file=sys.stderr)
+        return 130
     except Exception as exc:  # a defect here must not print a traceback, or anything holding the token
         print(f"error: INTERNAL: {type(exc).__name__}: {redact(str(exc), token)}", file=sys.stderr)
         return 2
@@ -856,7 +879,11 @@ def build(
     if _HOSTNAME_RE.fullmatch(args.realm) is None:
         raise BuildError("USAGE", "--realm must be a plain host name such as example.quickbase.com")
     if args.token_file is None and _ENV_NAME_RE.fullmatch(args.token_env) is None:
-        raise BuildError("USAGE", "--token-env must be an environment variable name")
+        raise BuildError(
+            "USAGE",
+            "--token-env takes the NAME of an environment variable, in capitals (A-Z, 0-9, _). The value given"
+            " is not shown, in case it is the token itself",
+        )
     if args.decided_by_id is not None and _USER_ID_RE.fullmatch(args.decided_by_id) is None:
         raise BuildError("USAGE", "--decided-by-id must be a Quickbase user id such as 123456.ab1s")
     started = now().astimezone(UTC)
@@ -868,6 +895,14 @@ def build(
     counts = {t.role: len(snap.tables[ROLE_DATASET[t.role]]) for t in plan}
     file_bytes = sum(len(data) for data in snap.files.values())
     outputs = [Path(args.mapping_out), Path(args.config_out)]
+    resolved = [p.resolve() for p in outputs]
+    if resolved[0] == resolved[1]:
+        raise BuildError("USAGE", "--mapping-out and --config-out must be two different files")
+    try:  # both are written by one write_files call, which undoes its own writes if either fails
+        common = Path(os.path.commonpath([p.parent for p in resolved]))
+    except ValueError:
+        raise BuildError("USAGE", "--mapping-out and --config-out must be on the same drive") from None
+    names = [p.relative_to(common).as_posix() for p in resolved]
     taken = [p.as_posix() for p in outputs if p.exists()]
     if taken and not args.force:
         raise BuildError("OUT_EXISTS", f"{', '.join(taken)}: exists (use --force to replace)")
@@ -915,30 +950,22 @@ def build(
         print(f"created app {ledger.app_id}")
         create_schema(client, plan, ledger, print)
         mapping_text = live_mapping_text(demo_text, ledger, stamp)
-        live = parse_mapping(loads_yaml(mapping_text, "quickbase-live.yml"), "quickbase-live.yml")
+        live = check_mapping(ledger, mapping_text)  # before any record is sent
         verify_schema(client, live, ledger)
         load_records(client, plan, snap, ledger, args.decided_by_id, print)
         accepted = snap.manifest["scope"]["accepted"]
         config_text = capture_config_text(ledger, args.token_env, accepted, stamp)
-        check_outputs(ledger, mapping_text, config_text)
-        for path, text in zip(outputs, (mapping_text, config_text), strict=True):
-            write_files(path.parent, {path.name: text.encode("utf-8")})
+        check_config(ledger, config_text)
     except (Exception, KeyboardInterrupt) as exc:
-        if ledger.app_id is None:  # createApp itself failed: say when an app may exist anyway
-            if isinstance(exc, RunError) and exc.code in REFUSED:
-                raise
-            if isinstance(exc, RunError):
-                code, detail = exc.code, exc.message
-            elif isinstance(exc, KeyboardInterrupt):
-                code, detail = "INTERRUPTED", "interrupted while createApp was in flight"
-            else:
-                code, detail = "INTERNAL", type(exc).__name__
+        reason = f"{exc.code}: {exc.message}" if isinstance(exc, RunError) else type(exc).__name__
+        if ledger.app_id is None:  # createApp itself failed
+            if client.requests == 0 or (isinstance(exc, RunError) and exc.code in REFUSED):
+                raise  # nothing was sent, or Quickbase answered and created nothing
             raise BuildError(
-                code,
-                f"{detail}. An app named {app_name!r} may have been created in {args.realm}; "
+                "APP_MAY_EXIST",
+                f"{reason}. An app named {app_name!r} may have been created in {args.realm}; "
                 "check for it before running again.",
             ) from None
-        reason = f"{exc.code}: {exc.message}" if isinstance(exc, RunError) else type(exc).__name__
         raise BuildError(
             "BUILD_INCOMPLETE",
             f"{reason}. App {ledger.app_id} ({app_name!r}) in {args.realm} was created and is incomplete "
@@ -946,6 +973,17 @@ def build(
         ) from None
     finally:
         client.close()
+
+    try:  # the app is complete; only the local files remain
+        write_files(common, {names[0]: mapping_text.encode("utf-8"), names[1]: config_text.encode("utf-8")})
+    except RunError as exc:
+        print(mapping_text, config_text, sep="\n")
+        raise BuildError(
+            "WRITE_FAILED",
+            f"app {ledger.app_id} in {args.realm} is complete; only writing the local files failed "
+            f"({exc.message}). Both files are printed above: save them as {outputs[0].as_posix()} and "
+            f"{outputs[1].as_posix()}.",
+        ) from None
 
     differ = [
         f"{t.role}.{fp.column} {fp.demo_fid}->{ledger.fid(t.role, fp.column)}"
