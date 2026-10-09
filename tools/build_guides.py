@@ -17,9 +17,11 @@ The Markdown files are the sources and read well on GitHub. For each guide the b
 ``--docx`` also writes a Word version with pandoc, when pandoc is installed. Nothing in src/ imports this script;
 markdown-it-py and pypdf come from the ephemeral uv environment shown above.
 
-The build is reproducible: the document date (by default, that of the last commit that changed the guides) stands
-in for the build time in the PDF metadata and in the DOCX package, so the same commit, browser and pandoc give the
-same bytes.
+Reproducibility: the document date (by default, that of the last commit that changed the guides) stands in for the
+build time in the PDF metadata and in the DOCX package. Rebuilding from the same commit therefore gives byte-identical
+Word files. The PDFs are identical in text, layout and appearance, and byte-identical in repeated runs. The
+browser does not guarantee byte identity in every run: a cold first run was once seen to omit invisible drawing
+detail.
 """
 
 from __future__ import annotations
