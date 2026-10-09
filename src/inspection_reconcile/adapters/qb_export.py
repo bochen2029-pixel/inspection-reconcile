@@ -424,7 +424,19 @@ def convert_export(
     files_index: dict[tuple[str, int, int, int], dict[str, Any]] = {}
     for item in manifest["files"]:
         files_index[(item["table_id"], item["record_id"], item["field_id"], item["version"])] = item
+    rows, notes = convert_records(mapping, records, files_index)
+    return manifest, rows, notes
 
+
+def convert_records(
+    mapping: Mapping,
+    records: dict[str, list[SourceRecord]],
+    files_index: dict[tuple[str, int, int, int], dict[str, Any]] | None = None,
+) -> tuple[dict[str, list[tuple[dict[str, str | None], int]]], _Notes]:
+    """Convert source records into canonical rows per dataset, as (cells with x_source, Record ID#), sorted by
+    key then Record ID#. ``files_index`` maps (table, rid, fid, version) to the export's file entries; files
+    whose entry is ``captured`` are scheduled for copying in the returned notes."""
+    files_index = files_index or {}
     # Each reference target: Record ID# -> the canonical id its key column converts to.
     key_maps: dict[str, dict[int, str | None]] = {}
     for role, key_column in ROLE_KEY_COLUMN.items():
@@ -433,7 +445,7 @@ def convert_export(
             continue
         key_field = target.fields[key_column]
         key_maps[role] = {
-            rec.rid: convert_value(key_field, rec.values[key_field.fid]).cell for rec in records[role]
+            rec.rid: convert_value(key_field, rec.values[key_field.fid]).cell for rec in records.get(role, [])
         }
 
     notes = _Notes()
@@ -441,7 +453,7 @@ def convert_export(
     for role, table in mapping.tables.items():
         dataset = ROLE_DATASET[role]
         out_rows: list[tuple[dict[str, str | None], int]] = []
-        for rec in records[role]:
+        for rec in records.get(role, []):
             source = f"table={table.table_id};rid={rec.rid}"
             cells: dict[str, str | None] = {}
             for column, _type, _req in SCHEMAS[dataset]:
@@ -471,7 +483,7 @@ def convert_export(
             out_rows.append((cells, rec.rid))
         out_rows.sort(key=lambda item: _sort_key(item[0], KEY_FIELDS[dataset], item[1]))
         rows[dataset] = out_rows
-    return manifest, rows, notes
+    return rows, notes
 
 
 def _resolve_reference(
@@ -611,6 +623,7 @@ __all__ = [
     "Converted",
     "SourceRecord",
     "convert_export",
+    "convert_records",
     "convert_value",
     "file_relative_path",
     "json_text",
