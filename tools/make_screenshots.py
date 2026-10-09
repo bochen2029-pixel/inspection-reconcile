@@ -91,7 +91,7 @@ def shot_script(keep: tuple[str, ...] | None) -> str:
     )
 
 
-def prepare_copy(page: Path, shot: Shot, dark: bool, work: Path) -> Path:
+def prepare_copy(page: Path, shot: Shot, dark: bool) -> Path:
     html = page.read_text(encoding="utf-8")
     if CSP not in html:
         raise SystemExit(f"{page}: the expected CSP meta is missing; the page layout changed")
@@ -161,19 +161,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     browser = find_browser(args.browser)
     out = Path(args.out)
-    with tempfile.TemporaryDirectory(prefix="ir-shots-") as tmp:
+    # A browser helper process can hold a throwaway profile for a moment after exit; that must not turn a
+    # successful run into a traceback.
+    with tempfile.TemporaryDirectory(prefix="ir-shots-", ignore_cleanup_errors=True) as tmp:
         work = Path(tmp)
         demo = work / "demo"
-        subprocess.run(
+        run = subprocess.run(
             [sys.executable, "-m", "inspection_reconcile", "demo", "--all", "--out", str(demo)],
             cwd=REPO,
-            check=True,
             timeout=600,
             capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
+        if run.returncode != 0:
+            raise SystemExit(f"demo --all exited {run.returncode}:\n{run.stdout}\n{run.stderr}")
         for shot in SHOTS:
             for dark in (False, True) if shot.dark else (False,):
-                copy = prepare_copy(demo / shot.page, shot, dark, work)
+                copy = prepare_copy(demo / shot.page, shot, dark)
                 name = f"{shot.name}{'-dark' if dark else ''}.png"
                 profile = work / f"profile-{name}"
                 width, height = capture(browser, profile, copy, shot.width, out / name)

@@ -915,7 +915,14 @@ Findings are matched by `key`. A finding has **changed** when its outcome, reaso
     - `normalize`: `manifest.json`, `project.json`, `scope.csv`, `inspections.csv`, `artifacts.csv`, `approvals.csv`, `approval_items.csv`, `normalization.json` and `evidence/`.
     - `capture-quickbase`: `capture-manifest.json`, `tables/` and `files/`.
   - `normalize` and `capture-quickbase` need `--out` to hold nothing but their own names. Anything else refuses the run (`OUT_NOT_EMPTY`) before a file is touched.
-  - Their new output is built in a staging directory inside `--out`. It replaces the previous output only when the run succeeds, so a refused or failed run leaves `--out` as it was.
+  - Their new output is built in a staging directory inside `--out`. It replaces the previous output only when the run succeeds, and only by renames inside `--out` (AM-10):
+    1. the previous output is moved into a `.previous-*` directory;
+    2. the new output is moved in;
+    3. only then is the previous output deleted.
+
+    If a rename fails (for example, another program holds a file open on Windows), the completed renames are undone and the run exits 2 (`WRITE_FAILED`) with `--out` as it was. If the previous output cannot be put back, the message names the `.previous-*` directory that holds it.
+  - A `.staging-*` directory left by an interrupted run is the command's own, and the next `--force` run deletes it. A `.previous-*` directory is not the command's own: it may hold the only copy of an earlier output, so it refuses the run (`OUT_NOT_EMPTY`) until it is restored or deleted (AM-10).
+  - `assess` and `demo` are not staged: their `--force` deletes their own previous outputs before writing, as above.
   - Symbolic links and junctions are never followed or deleted. Nothing outside `--out` is ever deleted.
 - **Failure.** Evaluation completes in memory before any output is written. If a write fails, every file this run wrote is removed, then every directory it created that is empty again. The run exits 2 (AM-9).
 
@@ -2162,6 +2169,7 @@ Every change adopted after v3.0 is recorded here, each with its decision in `doc
 | AM-7 | §22.13 | D-012 | a spec-only adapter review |
 | AM-8 | §22.14 | D-014 | a spec-only review of the foundations |
 | AM-9 | §22.15 | D-015 | a spec-only review of the output surfaces |
+| AM-10 | §22.16 | D-016 | the pre-publication go/no-go review |
 
 AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
@@ -2377,5 +2385,16 @@ A spec-only review of the JSON outputs, the report, the templates, `compare`, th
   - The policy file is read once, so its recorded size and digest are of the parsed bytes.
   - The digest notation of `inputs[].sha256` is stated (§9.3).
   - The standard-output rule names `assess` (§11).
+
+---
+
+### 22.16 Amendment AM-10: an all-or-nothing `--force` swap (decision D-016)
+
+The pre-publication review reproduced a breach of AM-9's own promise that "a refused or failed run leaves `--out` as it was". The swap deleted the previous output first and only then moved the new output in. On Windows, a file held open by another program can be neither deleted nor renamed, so `normalize --force` with one CSV open in a spreadsheet left `--out` with 1 of its 87 previous files. For `capture-quickbase` that loses a capture that cannot be taken again.
+
+- **The swap** is now two phases of renames inside `--out` (§9.6). Every completed rename is undone on any failure, and the previous output is deleted only once the new one is in place.
+- **A `.previous-*` directory** that a failed rollback leaves behind is never deleted by a later `--force`, because it may be the only copy.
+
+Six tests cover it: fault injection at each rename, and the real Windows lock.
 
 *End of specification v3.0.*

@@ -155,3 +155,15 @@ following defects:
 
 Helper task T5-surfaces made these fixes with 20 tests, failing first where they apply. The lead added the
 single policy read and its test.
+
+## D-016 · 2026-10-09 · Amendment AM-10: an all-or-nothing `--force` swap (SPEC §9.6, §22.16)
+The pre-publication go/no-go review (G1) found that a failed `--force` swap destroyed the previous output, which
+§9.6 forbids. Reproduced on Windows with one CSV held open: 86 of 87 previous files were gone. The swap now runs
+as two phases of renames inside `--out`, with a full rollback; the previous output is deleted only after the new
+one is in place, and a `.previous-*` directory is never deleted automatically.
+
+There are 6 tests, 4 of which fail on the old writer. The review's informational notes are handled as follows:
+- **Documented:** `assess` and `demo` are not staged.
+- **Kept as is:** `--log-json` relies on `basicConfig`, and hard links to `compare` inputs are not caught; both are
+  minor.
+- **Fixed:** `make_screenshots.py` cleanup.
