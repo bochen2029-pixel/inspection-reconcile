@@ -503,7 +503,7 @@ These references are checked on non-quarantined rows, and only when the target d
 
 | reference | the target must exist as | the target dataset that gains `COVERAGE_CONTRADICTED` |
 |---|---|---|
-| artifact `inspection_id` | an inspection row with a readable key and that `inspection_id` (any revision, quarantined or not) | inspections |
+| artifact `inspection_id` | an inspection row whose `inspection_id` cell is readable and equal, whatever its revision cell and whether quarantined or not (AM-2) | inspections |
 | approval `inspection_id` | the same | inspections |
 | item `approval_id` | an approval row with a readable key | approvals |
 | item `(artifact_id, artifact_revision)` | an artifact row with exactly that key | artifacts |
@@ -2205,6 +2205,10 @@ When `evidence_files` is omitted, every probe returns Absent without touching th
 
 - **A dangling reference** is attributed to the empty set, because its target does not exist, so the finding is advisory. Its uncertainty is carried by `COVERAGE_CONTRADICTED` on the target dataset (S20). It is not unattributable.
 - **A row whose key cannot be read** is unattributable. It downgrades its whole dataset to partial, so every dependent check becomes UNKNOWN. This blast radius is deliberate under I-2.
+
+### 22.8 Amendment AM-2: entity references resolve by the entity id
+
+An artifact's or approval's `inspection_id` refers to an inspection **entity**, so it resolves to any inspection row whose `inspection_id` cell is readable. The row's revision cell may be unreadable, and the row may be quarantined. A garbled revision on the inspection therefore yields one unattributable R0 finding (and the coverage downgrade), not false `DANGLING_REFERENCE` findings on every artifact and approval of that inspection. Item references to `(artifact_id, artifact_revision)` still require that exact key (decision D-004).
 
 ---
 

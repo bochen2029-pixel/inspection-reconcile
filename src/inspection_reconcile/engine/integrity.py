@@ -266,7 +266,10 @@ class Integrity:
 
     def step6(self) -> dict[str, int]:
         contradicted: dict[str, int] = defaultdict(int)
-        inspection_ids = {r.key[0] for r in self.rows["inspections"] if r.key is not None}
+        # AM-2: an entity reference resolves to any row whose entity-id cell is readable, whatever its revision.
+        inspection_ids = {
+            str(r.values["inspection_id"]) for r in self.rows["inspections"] if "inspection_id" in r.values
+        }
         approval_ids = {r.key[0] for r in self.rows["approvals"] if r.key is not None}
         artifact_keys = {r.key for r in self.rows["artifacts"] if r.key is not None}
         checks = (

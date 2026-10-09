@@ -26,3 +26,11 @@ AM-1 states them:
 - multi-subject templates; quarantined `raw` contents; the probe without an evidence root.
 
 The oracle YAML is unchanged.
+
+## D-004 · 2026-10-09 · Amendment AM-2: entity references resolve by the entity id (SPEC §7.5.6, §22.8)
+A rule-level test found that the original wording, "an inspection row with a readable key", made a garbled
+revision cell on one inspection produce false `DANGLING_REFERENCE` findings for every artifact and approval of
+that inspection. Those findings would also downgrade the inspections dataset with `COVERAGE_CONTRADICTED`, but
+the referenced entity is present. Entity references (`inspection_id`) now resolve to any row whose
+`inspection_id` cell is readable. Item references to `(artifact_id, artifact_revision)` still need the exact
+key. No oracle scenario is affected.
