@@ -1,0 +1,50 @@
+schema: inspection-reconcile/mapping/v1
+mapping_id: quickbase-demo
+version: "3.0.0"
+source: quickbase
+synthetic: true
+project: {project_id: NC-001, client_id: CL-SYN-01, name: "North Creek (synthetic)", synthetic: true}
+scope_filter: {fid: 7, value: NC-001}           # obligations table only: {7.EX.'NC-001'}
+tables:
+  obligations:
+    table_id: bsyn00001
+    fields:
+      obligation_id:  {fid: 6,  type: text}
+      project_id:     {fid: 7,  type: text}
+      scope_revision: {fid: 8,  type: text}
+      asset_id:       {fid: 9,  type: text}
+      activity_kind:  {fid: 10, type: text-multiple-choice, values: {"Visual Inspection": visual_inspection}}
+  inspections:
+    table_id: bsyn00002
+    fields:
+      inspection_id:     {fid: 6,  type: text}
+      revision:          {fid: 7,  type: numeric, as: integer_string}
+      is_current:        {fid: 8,  type: checkbox}
+      obligation_id:     {fid: 9,  type: reference, target: obligations}
+      project_id:        {fid: 10, type: text}
+      asset_id:          {fid: 11, type: text}
+      activity_kind:     {fid: 12, type: text-multiple-choice, values: {"Visual Inspection": visual_inspection}}
+      completion_status: {fid: 13, type: text-multiple-choice,
+                          values: {"Complete": completed, "In Progress": in_progress, "Not Started": not_started, "Cancelled": cancelled}}
+      completed_at:      {fid: 14, type: timestamp}
+  artifacts:
+    table_id: bsyn00003
+    fields:
+      artifact_id:   {fid: 6,  type: text}
+      revision:      {fid: 7,  type: numeric, as: integer_string}
+      is_current:    {fid: 8,  type: checkbox}
+      inspection_id: {fid: 9,  type: reference, target: inspections}
+      project_id:    {fid: 10, type: text}
+      asset_id:      {fid: 11, type: text}
+      document_kind: {fid: 12, type: text-multiple-choice, values: {"Inspection Report": inspection_report, "Photo": photo}}
+      relative_path: {fid: 13, type: file}
+  approvals:
+    table_id: bsyn00004
+    fields:
+      approval_id:         {fid: 6,  type: text}
+      inspection_id:       {fid: 7,  type: reference, target: inspections}
+      inspection_revision: {fid: 8,  type: numeric, as: integer_string}
+      evidence_digest:     {fid: 9,  type: text}
+      decision:            {fid: 10, type: text-multiple-choice, values: {"Approved": approved, "Rejected": rejected, "Revoked": revoked}}
+      decided_at:          {fid: 11, type: timestamp}
+      decided_by:          {fid: 12, type: user, as: email}
