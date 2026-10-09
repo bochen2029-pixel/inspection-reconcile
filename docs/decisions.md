@@ -79,3 +79,15 @@ A spec-only review of every engine module found three defects. None of them is r
 The review also found one false sentence, about the sort position of `null`, and five wording ambiguities. All
 are fixed, each defect with a regression test that fails on the old code. No oracle entry, vector or fixture
 identity changed.
+
+## D-010 · 2026-10-09 · The skip-paging fallback (SPEC §12.1, §22.10)
+§12.1 named a fallback for a source that refuses the `{3.GT.n}` comparison, and nothing implemented it. It is now
+built as specified in the AM-4 addendum (helper task T3b, reviewed):
+- **Trigger.** It fires only on HTTP status 400 for a table's first keyset query. The client raises a typed
+  error that carries the status, so server text cannot trigger it.
+- **The read.** Skip reads run until an empty page, because Quickbase can return short pages mid-table, and
+  they use per-page total accounting.
+- **Stall guard.** A source that ignores `skip` stops the read instead of spinning to `max_pages`.
+- **The manifest** records the mode in an optional `tables[].paging` member.
+
+C3 confirms which mode a real realm needs.

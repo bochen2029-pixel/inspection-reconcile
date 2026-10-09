@@ -22,7 +22,7 @@ from typing import Any
 from inspection_reconcile import grammar
 from inspection_reconcile import validate as v
 from inspection_reconcile.adapters.mapping import Mapping, TableMap, verify_fields
-from inspection_reconcile.adapters.qb_client import LOGGER_NAME, QuickbaseClient
+from inspection_reconcile.adapters.qb_client import LOGGER_NAME, QuickbaseClient, QuickbaseHTTPError
 from inspection_reconcile.adapters.qb_export import (
     CAPTURE_MANIFEST,
     EXPORT_FORMAT,
@@ -271,9 +271,8 @@ def _read_keyset(
         }
         try:
             page = client.run_query(body)
-        except RunError as exc:
-            refused = exc.code == "QB_HTTP_ERROR" and "HTTP 400" in exc.message
-            if refused and page_number == 0 and allow_fallback:
+        except QuickbaseHTTPError as exc:
+            if exc.status == 400 and page_number == 0 and allow_fallback:
                 raise _KeysetRefused() from exc
             raise
         total, data, rids = _check_page(read, page, select, label)
@@ -333,9 +332,14 @@ def _read_skip(
             return read
         if not _ascending(rids, floor) or seen.intersection(rids):
             read.accounting_ok = False
-        seen.update(rids)
-        floor = max(floor, max(rids))
         read.retrieved += len(data)
+        if max(rids) <= floor:
+            read.accounting_ok = (
+                False  # no new record ids (a source ignoring skip): stop rather than loop (C-5)
+            )
+            return read
+        seen.update(rids)
+        floor = max(rids)
     raise RunError(
         "QB_MAX_PAGES", f"{label}: more than {max_pages} pages; raise limits.max_pages deliberately"
     )

@@ -62,6 +62,15 @@ class AllowlistError(Exception):
     """A request outside the read-only allowlist: a programming error, raised before any I/O."""
 
 
+class QuickbaseHTTPError(RunError):
+    """``QB_HTTP_ERROR``: a 4xx other than 401, 403 and 429, never retried. ``status`` lets a caller act on the
+    status itself instead of parsing a message that also carries server-supplied text."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__("QB_HTTP_ERROR", message)
+        self.status = status
+
+
 def redact(text: str, token: str | None = None) -> str:
     """Remove a user token, any ``QB-USER-TOKEN <value>`` pair and any Authorization value from ``text``."""
     if token:
@@ -341,7 +350,7 @@ class QuickbaseClient:
             detail = self._error_detail(response)
             if status in (401, 403):
                 raise RunError("QB_PERMISSION", f"{operation} was refused with HTTP {status}: {detail}")
-            raise RunError("QB_HTTP_ERROR", f"{operation} failed with HTTP {status}: {detail}")
+            raise QuickbaseHTTPError(status, f"{operation} failed with HTTP {status}: {detail}")
 
     def _retry_or_raise(self, operation: str, attempt: int, last: str, delay: float) -> None:
         if attempt >= self._max_attempts:

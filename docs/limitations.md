@@ -16,7 +16,7 @@ is used anywhere in the repository.
 | Quickbase JSON API facts | Checked on 2026-10-09 against Quickbase's official OpenAPI document and API portal pages (SPEC §12.1). The facts marked unverified there are checked by the connector's schema verification at run time. |
 | Quickbase export adapter (normalize) | Built from the published contract and synthetic exports. S16 normalizes to S01's exact identities. |
 | Quickbase capture client | Tested against a mock app that follows the published contract: pagination, rate limits, retries, permission errors, schema drift, mid-capture changes, oversized files and token redaction. A capture of the mock app gives S01's findings (Checkpoint C-mock, D-005). **Not yet run against a live Quickbase app** (step C3, which needs an authorized test app and a user token). |
-| Quickbase keyset filter | The `{3.GT.<n>}` comparison on Record ID# is not confirmed by the published documentation. Step C3 confirms it; if it is refused, the specified fallback is skip paging with per-page total accounting (SPEC §12.1). |
+| Quickbase keyset filter | The `{3.GT.<n>}` comparison on Record ID# is not confirmed by the published documentation. If a realm refuses it (HTTP 400 on a table's first query), the capture falls back to skip paging with per-page total accounting (SPEC §12.1, D-010). Both modes are tested against the mock; step C3 shows which one a real realm uses, and the manifest records it. |
 
 ## Semantics
 - **One problem at a time per obligation.** The dependency chain shows the first blocking problem; a second,

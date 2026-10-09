@@ -710,6 +710,45 @@ def test_a_refusal_after_the_first_page_is_a_run_error(
     assert info.value.code == "QB_HTTP_ERROR"
 
 
+def test_only_an_http_400_triggers_the_fallback(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    """The decision uses the status, not the message: a 404 whose server text mentions "HTTP 400" stays an error."""
+    app.hooks.append(
+        lambda request, body: (
+            httpx.Response(404, json={"message": "Not Found", "description": "upstream said HTTP 400"})
+            if body and body.get("from") == "bsyn00002" and ".GT." in (body.get("where") or "")
+            else None
+        )
+    )
+    with pytest.raises(RunError) as info:
+        run_capture(client, mapping, tmp_path / "export")
+    assert info.value.code == "QB_HTTP_ERROR" and "HTTP 404" in info.value.message
+    assert not [q for q in app.queries if q["from"] == "bsyn00002" and "where" not in q]
+
+
+def test_a_source_that_ignores_skip_stops_the_read(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    """C-5 for skip paging: a page without new record ids ends the read as an accounting failure."""
+    app.refuse_gt = True
+
+    def ignore_skip(request: httpx.Request, body: Any) -> None:
+        if body and body.get("from") == "bsyn00002" and "where" not in body:
+            body["options"]["skip"] = 0
+        return None
+
+    app.hooks.append(ignore_skip)
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    assert manifest["tables"]["inspections"]["retrieved"] == 30  # two identical pages, then the stop
+    assert manifest["datasets"]["inspections"] == {
+        "coverage": "partial",
+        "basis": ["pagination_incomplete"],
+        "consistency": "changed_during_capture",
+    }
+    assert len([q for q in app.queries if q["from"] == "bsyn00002" and "where" not in q]) == 4  # 2 per pass
+
+
 def test_keyset_is_recorded_when_it_works(tmp_path: Path, client: QuickbaseClient, mapping: Mapping) -> None:
     manifest = run_capture(client, mapping, tmp_path / "export")
     assert {t["paging"] for t in manifest["tables"].values()} == {"keyset"}

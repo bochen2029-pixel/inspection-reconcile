@@ -2247,6 +2247,12 @@ Found while implementing C2:
   - `capture.started_at` and `capture.ended_at` are canonical TS values.
 - **No keyset progress.** A non-empty page whose largest record ID does not exceed the previous `last` is an accounting failure. The read stops there, incomplete, instead of running on to `max_pages`.
 - **Stored responses.** `fields.json`, the page files and `pass2.json` hold the parsed responses, re-serialized as 2-space-indented UTF-8 JSON, not the raw response bytes. The HTTP client returns parsed JSON.
+- **The skip fallback (§12.1; decision D-010).**
+  - **Trigger.** A table falls back when its first keyset query is refused with HTTP status 400. The decision uses the status, never the message text. A refusal after the first page, or any other status, is a run error.
+  - **The read.** Capture re-reads that table with skip paging: `where` is the base filter only, the sort is Record ID# ascending, and `options.skip` is the number of records retrieved so far. The read runs until an empty page; a short page does not end it.
+  - **Completeness.** The read is complete only when every page reports the first page's `totalRecords`, record IDs strictly increase across all pages, and `retrieved` equals that total. Otherwise the table is `partial` with `[pagination_incomplete]`. A page with no record ID above the previous maximum stops the read as an accounting failure, as in C-5.
+  - **Pass 2** uses the paging mode of pass 1.
+  - **The manifest** records `tables[].paging` as `keyset` or `skip`. The member is optional in the export schema, since fixture exports omit it, and it has no semantic effect.
 
 ---
 
