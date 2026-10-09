@@ -107,7 +107,7 @@ def cmd_normalize(args: argparse.Namespace) -> int:
     out = Path(args.out)
     prepare_out(out, args.force, own_dirs=())
     if out.exists() and any(out.iterdir()):
-        raise RunError("OUT_NOT_EMPTY", f"{out}: normalize needs an absent or empty directory")
+        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: normalize needs an absent or empty directory")
     normalize(Path(args.export), load_mapping(Path(args.mapping)), out)
     print(f"normalized snapshot written to {out.as_posix()}")
     return EXIT_OK
@@ -166,26 +166,20 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
 def cmd_capture(args: argparse.Namespace) -> int:
     try:
         from inspection_reconcile.adapters.mapping import load_mapping
-        from inspection_reconcile.adapters.qb_capture import capture, load_capture_config
-        from inspection_reconcile.adapters.qb_client import QuickbaseClient
-    except ImportError as exc:  # pragma: no cover - present once step C2 is merged
+        from inspection_reconcile.adapters.qb_capture import capture, load_capture_config, make_client
+    except ImportError as exc:  # pragma: no cover - the quickbase extra (httpx) is not installed
         raise RunError("NOT_AVAILABLE", f"the Quickbase connector is not installed: {exc}") from exc
     config = load_capture_config(Path(args.config))
     mapping = load_mapping(Path(args.mapping))
     out = Path(args.out)
     prepare_out(out, args.force)
-    token = os.environ.get(config.token_env)
-    if not token:
-        raise RunError("QB_TOKEN_MISSING", f"environment variable {config.token_env} is not set")
-    with QuickbaseClient(
-        config.realm_hostname,
-        token,
-        user_agent=f"inspection-reconcile/{__version__}",
-        requests_per_10s=config.requests_per_10s,
-        max_attempts=config.max_attempts,
-        max_retry_wait_s=config.max_retry_wait_s,
-    ) as client:
+    if out.exists() and any(out.iterdir()):
+        raise RunError("OUT_NOT_EMPTY", f"{out.as_posix()}: capture needs an absent or empty directory")
+    client = make_client(config, user_agent=f"inspection-reconcile/{__version__}")  # QB_TOKEN_MISSING
+    try:
         capture(client, config, mapping, out, now=lambda: datetime.now(UTC))
+    finally:
+        client.close()
     print(f"capture written to {out.as_posix()}")
     return EXIT_OK
 

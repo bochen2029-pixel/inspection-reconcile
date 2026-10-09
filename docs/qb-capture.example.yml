@@ -1,0 +1,22 @@
+# Example configuration for `inspection-reconcile capture-quickbase` (SPEC §12.5, Appendix D, step C3).
+# Copy it to local/qb-capture.yml (gitignored) and fill in your own test app. The user token is read only from
+# the environment variable named in token_env; never put a token in this file.
+schema: inspection-reconcile/qb-capture/v1
+realm_hostname: example.quickbase.com
+app_id: bxxxxxxxx
+token_env: QB_USER_TOKEN
+page_size: 1000
+capture_files: true
+scope:
+  scope_revision: S1
+  accepted: {by: "Name of the person who accepted the scope", at: "2026-10-01T00:00:00Z", reference: "REF-1"}
+limits:
+  max_file_bytes: 104857600
+  requests_per_10s: 90
+  max_attempts: 5
+  max_retry_wait_s: 60
+  max_pages: 10000
+operator_attestation:
+  full_read_access: true
+  attested_by: "Name of the person attesting"
+  note: "Authorized test app; the token's role can read every record of the mapped tables"
