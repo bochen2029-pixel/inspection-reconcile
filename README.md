@@ -133,8 +133,21 @@ document and the API portal's field-type pages, checked on 2026-10-09 (SPEC §12
   rate limiting, retries, keyset pagination by Record ID#, an interleaved two-pass consistency check, and token
   redaction.
 
-**Status:** tested against a mock transport that follows the published OpenAPI contract; **not yet run against a
-live Quickbase app**. [Appendix D of the spec](docs/SPEC.md) describes a test-app blueprint for that step.
+```bash
+# a Quickbase-shaped export, assessed through the field mapping (same identities as the canonical S01)
+uv run inspection-reconcile assess --export fixtures/scenarios/S16-quickbase-clean/export \
+    --mapping mappings/quickbase-demo.yml --policy policies/north-creek-demo.yml --out out/s16
+
+# a read-only capture from your own Quickbase app; the token is read only from the environment
+uv run inspection-reconcile capture-quickbase --config local/qb-capture.yml \
+    --mapping mappings/quickbase-demo.yml --out out/capture
+```
+
+Copy [docs/qb-capture.example.yml](docs/qb-capture.example.yml) to start a capture configuration.
+
+**Status:** tested against a mock Quickbase app that follows the published OpenAPI contract. A capture of that mock
+app gives the same finding for every requirement as the canonical scenario. The capture has **not yet run against
+a live Quickbase app**; [Appendix D of the spec](docs/SPEC.md) describes a test-app blueprint for that step.
 
 ## How it is tested
 
@@ -147,6 +160,10 @@ live Quickbase app**. [Appendix D of the spec](docs/SPEC.md) describes a test-ap
 - **Properties.** Shuffling input rows never changes the result (P1). Two runs give byte-identical outputs (P2).
   Downgrading any dataset's coverage never turns a non-pass into a pass (P3).
 - **Cross-platform.** CI compares the evaluation identities and report digests from Linux, Windows and macOS.
+- **Independent reviews.** Separate review passes re-derived the oracle and checked the engine against the
+  specification text alone. Every confirmed finding became a logged amendment, and every code defect got a
+  regression test ([docs/decisions.md](docs/decisions.md)). [docs/status.md](docs/status.md) maps every invariant and acceptance
+  criterion to the test that proves it.
 
 ## Repository map
 
