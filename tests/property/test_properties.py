@@ -58,13 +58,25 @@ def test_p1_row_order_invariance(scenario_id, seed):
     "scenario_id", ["S01-clean", "S05-incomplete-capture", "S17-quickbase-unmapped-value"]
 )
 def test_p2_idempotence(scenario_id):
-    if scenario_id.startswith("S17"):
-        pytest.skip("export scenarios are covered once normalize exists (step B2)")
-    first = ss.run_scenario(scenario_id)
-    second = ss.run_scenario(scenario_id)
-    dump = lambda a: json.dumps([f.to_json() for f in a.findings], sort_keys=True)  # noqa: E731
-    assert dump(first) == dump(second)
-    assert first.evaluation_id == second.evaluation_id
+    """Two complete runs give byte-identical assessment.json and report.html (for S17 each run normalizes the
+    export afresh, so this also proves normalize is deterministic)."""
+    from conftest import REPO, SCENARIOS
+
+    from inspection_reconcile.runner import evaluate, normalized_export
+
+    _, policy = ss.scenario_paths(scenario_id)
+
+    def run() -> dict[str, bytes]:
+        export = SCENARIOS / scenario_id / "export"
+        if export.is_dir():
+            with normalized_export(export, REPO / "mappings" / "quickbase-demo.yml") as (snap, info):
+                return evaluate(snap, policy, mapping=info).outputs()
+        return evaluate(SCENARIOS / scenario_id / "snapshot", policy).outputs()
+
+    first, second = run(), run()
+    assert first["assessment.json"] == second["assessment.json"]
+    assert first["report.html"] == second["report.html"]
+    assert json.loads(first["assessment.json"])["status"] == ss.ORACLE["scenarios"][scenario_id]["status"]
 
 
 def complete_coverage_scenarios() -> list[str]:

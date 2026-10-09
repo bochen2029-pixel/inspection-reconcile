@@ -1136,7 +1136,7 @@ tables:
 
 **Mapping rules.** A violation is a run error unless stated otherwise.
 
-- **Coverage of columns.** Every required canonical column (§5.5) is mapped exactly once. A nullable column MAY be omitted, which makes it `null`. FIDs are positive integers, and no FID is mapped twice within a table. Fields 2 and 3 are always selected. Mapping field 2 or 3 to a canonical column is allowed only for `type: recordid` or `timestamp`, respectively.
+- **Coverage of columns.** Every required canonical column (§5.5) is mapped exactly once. A nullable column MAY be omitted, which makes it `null`. FIDs are positive integers, and no FID is mapped twice within a table. Fields 2 and 3 are always selected. Mapping field 2 or 3 to a canonical column is allowed only for `type: timestamp` (field 2) or `recordid` (field 3) (AM-3).
 - **Types.** Each mapping type names the expected `getFields` `fieldType`:
 
   | type | expected fieldType |
@@ -1149,6 +1149,7 @@ tables:
   | `user` | `user` |
   | `file` | `file` |
   | `reference` | `numeric` |
+  | `recordid` | `recordid` (AM-3) |
 
   `normalize` checks the export's `fields.json` against this table, and C2 checks the live field list. A mismatch is a run error that names both values. Every mapped field MUST also have a blank `mode` (a data-entry field), except where the mapping explicitly declares `allow_derived: true`.
 - **Value maps.** `values` maps source labels to canonical enum values, exactly and case-sensitively. Keys MUST be strings (§6.2). A label missing from the map is never guessed. The canonical cell receives the raw label, and `normalization.json` lists it under `unmapped_values`, keyed by the row's `x_source` and the field. R0 then reports `UNMAPPED_VALUE`.
@@ -1163,6 +1164,7 @@ tables:
   | `timestamp` | string | the string, validated by R0; null or `""` becomes null |
   | `user` with `as: email` | user object | its `email` |
   | `file` | file attachment value | see "Files" below |
+  | `recordid` | integer | its decimal string (AM-3) |
   | `reference` | numeric Record ID# | resolved against the **captured** rows of the target table to its canonical id (`obligation_id`, `inspection_id` or `approval_id`) |
 
   An unresolved reference becomes the placeholder `qbrid.<target_table_id>.<rid>`, which is a valid ID, and is listed under `unresolved_references`. R0 then reports `DANGLING_REFERENCE` if the target dataset is declared complete, and R7 reports an unresolved obligation link. A null reference becomes null.
@@ -2211,5 +2213,16 @@ When `evidence_files` is omitted, every probe returns Absent without touching th
 An artifact's or approval's `inspection_id` refers to an inspection **entity**, so it resolves to any inspection row whose `inspection_id` cell is readable. The row's revision cell may be unreadable, and the row may be quarantined. A garbled revision on the inspection therefore yields one unattributable R0 finding (and the coverage downgrade), not false `DANGLING_REFERENCE` findings on every artifact and approval of that inspection. Item references to `(artifact_id, artifact_revision)` still require that exact key (decision D-004).
 
 ---
+
+### 22.9 Amendment AM-3: mapping and export completions (decision D-007)
+
+Found while implementing B1/B2:
+
+- **Type and column compatibility.** `file` maps only to `relative_path`, and `relative_path` only from `file`. BOOL columns accept `checkbox` or `text`. TS columns accept `timestamp` or `text`. `reference` maps only to link columns (§5.5) and targets the parent table. A multiple-choice field feeding a KIND or enum column needs a `values` map, and its targets are validated against that column's grammar or enum.
+- **Scope filter.** `scope_filter.fid` is the obligations table's `project_id` field, and its value equals `project.project_id`.
+- **Derived fields.** `allow_derived` is a table-level boolean.
+- **Long file names.** The 8-hex-digit suffix is taken from the SHA-256 of the original (unsanitized) name in UTF-8.
+- **Export manifest.** `two_pass` is `not_run`, `stable` or `changed`. A `files[]` entry that is not `captured` has `path`, `bytes` and `sha256` set to null; a captured entry has all three and a safe relative path.
+- **`normalize` refuses an inconsistent export** (`EXPORT_INVALID`): page files that differ from `tables[role].pages`, a record count that differs from `retrieved`, captured bytes that differ from the declared size or SHA-256, an unmapped table or a mapped table missing, or a record lacking a mapped field.
 
 *End of specification v3.0.*

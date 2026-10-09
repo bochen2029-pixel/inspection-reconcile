@@ -42,6 +42,16 @@ semantic digest (§8.4), so `evaluation_id` legitimately differs. The C2 check i
 app built from the S01 records, normalized and assessed, gives the same `(key, outcome, reason)` for every
 finding as S01, and the status READY_FOR_REVIEW. Exact identity equality remains the B3 test (S16 ≡ S01).
 
+## D-007 · 2026-10-09 · Amendment AM-3: mapping and export completions (SPEC §12.3, §22.9)
+Gaps found while implementing B1/B2 (G1-G6), adopted with the conservative reading:
+- **G1, a corrected pairing.** Field 2 maps only as `timestamp` and field 3 only as `recordid`.
+- **G2, a `recordid` type.** It is added to the type and conversion tables.
+- **G3, mapping consistency rules.** Type and column compatibility, references only on link columns, required
+  value maps, the scope filter tied to `project_id`, and a table-level `allow_derived`.
+- **G4, the hash input.** The long-file-name hash is taken over the original name.
+- **G5, a closed-world export manifest.**
+- **G6, export consistency.** `normalize` refuses inconsistent exports (`EXPORT_INVALID`).
+
 ## D-006 · 2026-10-09 · Parallel work by helper sessions
 Two other Claude Code sessions of the same operator work on claimed, file-scoped tasks in separate git worktrees
 (T2: the HTTP client; T3: mapping, normalize and capture; T4: SQL export). The main session reviews and merges
