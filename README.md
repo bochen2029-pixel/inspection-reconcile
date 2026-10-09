@@ -129,9 +129,13 @@ document and the API portal's field-type pages, checked on 2026-10-09 (SPEC §12
 - a field-ID **mapping**, verified against the live field list (`fieldType` and `mode`, not display labels);
 - **normalize**, which turns a Quickbase-shaped export into a canonical snapshot (S16 normalizes to exactly the
   same identities as the canonical S01);
-- a **read-only capture client**. It has an allowlist of four read operations (no write or delete can be issued),
-  rate limiting, retries, keyset pagination by Record ID#, an interleaved two-pass consistency check, and token
-  redaction.
+- a **read-only capture client**. It has:
+  - an allowlist of four read operations, so no write or delete can be issued;
+  - rate limiting and retries;
+  - keyset pagination by Record ID#, falling back to skip paging if a realm refuses the keyset filter;
+  - per-page total accounting and an interleaved two-pass consistency check;
+  - streamed file downloads with a size cap;
+  - token redaction.
 
 ```bash
 # a Quickbase-shaped export, assessed through the field mapping (same identities as the canonical S01)
