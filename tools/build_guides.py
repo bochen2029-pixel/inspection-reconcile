@@ -16,6 +16,10 @@ The Markdown files are the sources and read well on GitHub. For each guide the b
 
 ``--docx`` also writes a Word version with pandoc, when pandoc is installed. Nothing in src/ imports this script;
 markdown-it-py and pypdf come from the ephemeral uv environment shown above.
+
+The build is reproducible: the document date (by default, that of the last commit that changed the guides) stands
+in for the build time in the PDF metadata and in the DOCX package, so the same commit, browser and pandoc give the
+same bytes.
 """
 
 from __future__ import annotations
@@ -343,13 +347,16 @@ def outline_items(writer: PdfWriter) -> list[Any]:
     return items
 
 
-def finish_pdf(pdf: Path, meta: dict[str, str], entries: list[Entry]) -> None:
-    """Clean outline titles ("2.3 Reading the report") and document metadata."""
+def finish_pdf(pdf: Path, meta: dict[str, str], entries: list[Entry], when: dt.date) -> None:
+    """Clean outline titles ("2.3 Reading the report") and document metadata. The two dates are the document's
+    date, not the time of the build: everything else Chrome writes is already reproducible, so the same sources
+    and date give the same bytes."""
     writer = PdfWriter(clone_from=pdf)
     items = outline_items(writer)
     for e in entries:
         if e.outline_index is not None and e.outline_index < len(items):
             items[e.outline_index][NameObject("/Title")] = TextStringObject(f"{e.number} {e.text}")
+    stamp = f"D:{when.strftime('%Y%m%d')}000000+00'00'"
     writer.add_metadata(
         {
             "/Title": f"inspection-reconcile {meta['title']}",
@@ -357,6 +364,8 @@ def finish_pdf(pdf: Path, meta: dict[str, str], entries: list[Entry]) -> None:
             "/Subject": meta["subtitle"],
             "/Keywords": "inspection documentation, readiness, Quickbase, reconciliation",
             "/Creator": "tools/build_guides.py (headless Chromium)",
+            "/CreationDate": stamp,
+            "/ModDate": stamp,
         }
     )
     with open(pdf, "wb") as handle:
@@ -390,7 +399,7 @@ def build_pdf(source: Path, browser: str, paper: str, when: dt.date, keep_html: 
             f"{target.name}: the page count changed between passes ({pages_before} -> {pages_after})"
         )
     assign_pages(entries, outline_pages(target), source.name)  # the final positions, for the title rewrite
-    finish_pdf(target, meta, entries)
+    finish_pdf(target, meta, entries, when)
     leaks = [m.group(0) for m in re.finditer(rb"file\\?(?:072|:)", target.read_bytes())]
     if leaks:  # a local file URL would expose the build machine's paths
         raise SystemExit(f"{target.name}: contains {len(leaks)} local file link(s)")
@@ -476,6 +485,13 @@ def build_docx(source: Path, when: dt.date, browser: str) -> Path | None:
             encoding="utf-8",
             check=True,
             timeout=180,
+            # pandoc dates the package (core.xml and every zip entry) from SOURCE_DATE_EPOCH when it is set.
+            env={
+                **os.environ,
+                "SOURCE_DATE_EPOCH": str(
+                    int(dt.datetime(when.year, when.month, when.day, tzinfo=dt.UTC).timestamp())
+                ),
+            },
         )
     with zipfile.ZipFile(target) as package:
         xml = "".join(
@@ -498,19 +514,49 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only", choices=sorted(GUIDES))
     parser.add_argument("--paper", choices=sorted(PAPER), default="letter")
     parser.add_argument("--docx", action="store_true")
-    parser.add_argument("--date", type=dt.date.fromisoformat, default=dt.datetime.now(dt.UTC).date())
+    parser.add_argument(
+        "--date",
+        type=dt.date.fromisoformat,
+        help="the document date; default: the date of the last commit that changed docs/guide",
+    )
     parser.add_argument("--browser")
     parser.add_argument("--keep-html", type=Path)
     args = parser.parse_args(argv)
     browser = find_browser(args.browser)
+    when = args.date or source_date()
     for key, name in GUIDES.items():
         if args.only and key != args.only:
             continue
         source = GUIDE_DIR / name
-        build_pdf(source, browser, args.paper, args.date, args.keep_html)
+        build_pdf(source, browser, args.paper, when, args.keep_html)
         if args.docx:
-            build_docx(source, args.date, browser)
+            build_docx(source, when, browser)
     return 0
+
+
+def source_date() -> dt.date:
+    """The date of the last commit that changed the guides' sources, so that a rebuild from the same commit gives
+    the same bytes; today's date outside a Git checkout."""
+    result = subprocess.run(
+        [
+            "git",
+            "log",
+            "-1",
+            "--format=%cs",
+            "--",
+            "docs/guide/user-guide.md",
+            "docs/guide/admin-guide.md",
+            "docs/guide/guide.css",
+            "docs/guide/img",
+        ],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    text = result.stdout.strip()
+    return dt.date.fromisoformat(text) if result.returncode == 0 and text else dt.datetime.now(dt.UTC).date()
 
 
 if __name__ == "__main__":
