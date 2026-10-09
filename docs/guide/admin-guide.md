@@ -419,9 +419,9 @@ The Quickbase adapter has three parts:
 
 > [!IMPORTANT]
 > The adapter was built from Quickbase's published RESTful JSON API contract, checked on 2026-10-09, and is tested
-> against a mock app that follows it. A capture of that mock app gives the same finding for every requirement as the
-> canonical scenario. It has **not yet run against a live Quickbase app**. That step, C3, needs an authorized test app
-> and a user token; see [Live verification](#live-verification).
+> against a mock app that follows it. **On 2026-10-09 it was also verified against a live Quickbase test app.** A
+> read-only capture of that app gives the same outcome and reason for every requirement as the canonical scenario;
+> see [Live verification](#live-verification).
 
 ### The field mapping
 
@@ -600,6 +600,22 @@ Connections time out after 10 seconds, and reads after 60. Requests are sequenti
 4. capturing, assessing, and comparing the result with the canonical scenario S01.
 
 The expected result is `READY_FOR_REVIEW`, with no finding added, removed or changed in outcome or reason.
+
+**The first live run, on 2026-10-09, gave exactly that.** In a Quickbase free-trial realm:
+- **The build:** all 29 field IDs as mapped.
+- **The capture:** it paged by keyset, got 80 of 80 files, and declared every dataset complete on all three bases
+  (the totals matched, two passes agreed, and the operator attested access).
+- **The assessment:** `READY_FOR_REVIEW`, 207 of 207 PASS.
+- **The comparison with S01:** no finding added, removed or changed in outcome or reason.
+
+The run also verified the API facts that Quickbase's documents left open (SPEC §12.1, §22.18). It still leaves some
+paths covered only by the mock tests: the least-privilege role, the skip fallback, tables longer than one page,
+files near the size limit, and throttling.
+
+> [!TIP]
+> Use a realm of your own. A plain registration at `login.quickbase.com` cannot create apps (403), so start a free
+> trial. A user token works only in the realm where you made it (401 elsewhere), so create it after you sign in to
+> the trial realm.
 
 The runbook's fast path replaces the first two steps with one command, using a token for your own user.
 `tools/qb_build_test_app.py` creates the app, its tables, fields and relationships, and the S01 records with their
@@ -872,8 +888,9 @@ profile.
 | Digests | the specification's test vectors are reproduced; the fixtures' digests come from an independent implementation in the generator |
 | Cross-platform identity | CI compares Linux, Windows and macOS |
 | Quickbase export adapter (normalize) | built from the published contract and synthetic exports; S16 normalizes to S01's exact identities |
-| Quickbase capture client | tested against a mock app that follows the published contract: pagination, rate limits, retries, permission errors, schema drift, mid-capture changes, oversized files and token redaction. **Not yet run against a live Quickbase app** |
-| The keyset filter `{3.GT.n}` | not confirmed by Quickbase's documentation; if a realm refuses it, the skip fallback applies. Both modes are tested against the mock |
+| Quickbase capture client | **verified against a live Quickbase test app on 2026-10-09**: the capture paged by keyset, earned completeness on all three bases, and gave S01's findings, 207 of 207 PASS. Also tested against a mock app that follows the published contract: pagination, rate limits, retries, permission errors, schema drift, mid-capture changes, oversized files and token redaction |
+| The keyset filter `{3.GT.n}` | not confirmed by Quickbase's documentation, but accepted by the live realm. If a realm refuses it, the skip fallback applies; both modes are tested against the mock |
+| Live paths not yet exercised | the least-privilege role and its own token, the skip fallback, tables longer than one page, files near the size limit, and throttling: these are tested against the mock only |
 
 ### Known limitations
 

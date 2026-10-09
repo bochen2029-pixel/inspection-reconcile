@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Live verification (step C3)
+- **Verified against a live Quickbase app on 2026-10-09** (Checkpoint C, SPEC AM-12, decision D-018).
+  - In a free-trial realm, the builder made the Appendix D app with every field ID as mapped.
+  - The read-only capture paged by keyset, got 80 of 80 files, and earned completeness on all three bases.
+  - The assessment is `READY_FOR_REVIEW`, 207 of 207 PASS, with no finding added, removed or changed against S01.
+  - Seven facts that the published documents left open are now verified live (SPEC §12.1).
 - **`tools/qb_build_test_app.py`** builds the Appendix D test app in your own Quickbase realm with one command:
   - the app, the four tables, their fields and relationships, and the 200 S01 records with their 80 files;
   - then `local/quickbase-live.yml` and `local/qb-capture.yml`.

@@ -193,3 +193,21 @@ The request it was built to differed in three ways, each forced by the API:
   allowlist has no update.
 
 The runbook's fast path keeps the token in the environment variable that `capture-quickbase` reads.
+
+## D-018 · 2026-10-09 · Amendment AM-12: the C3 live verification (SPEC §12.1, §22.18)
+Step C3 ran on 2026-10-09, at `4429754`, in a Quickbase free-trial realm owned by the operator. Helper blk6aqof ran
+it by the runbook, and the lead re-checked the evidence. The results:
+- **The build:** all 29 field ids equal the demo mapping's.
+- **The capture:** it paged by keyset and captured 80 of 80 files, and earned completeness on all three bases.
+- **The assessment:** `READY_FOR_REVIEW`, 207 of 207 PASS.
+- **The comparison with S01:** no finding added, removed or changed in outcome or reason.
+
+**Checkpoint C is reached.** §12.1 records seven facts that are now verified live, among them `timestamp`, the
+keyset filter and the built-in fields. Two first attempts were refused (a token from another realm: 401; a
+registration without app-creation rights: 403). The builder handled both as designed, and the runbook now tells
+the reader to start a free trial and to create the token in that realm.
+
+**Public records** name no realm, app, table or user. The raw capture stays in the operator's gitignored `local/`.
+
+**Not covered by the run:** the least-privilege role, the skip fallback, multi-page tables, near-limit files and
+throttling. `docs/limitations.md` lists them.

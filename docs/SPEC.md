@@ -129,7 +129,7 @@ An auditor, records coordinator or applications developer who is preparing a pro
 - Canonical snapshots; Quickbase-shaped exports with a mapping; checks R0–R7; 24 oracle scenarios.
 - The CLI: `validate`, `assess`, `normalize`, `compare`, `demo`, `evidence-digest`, `export-sqlite`, `capture-quickbase`.
 - JSON, HTML and SQLite outputs.
-- A read-only live connector, tested against a mock transport built from the official API contract. Live testing against an authorized Quickbase test app is a separate, operator-gated step (C3).
+- A read-only live connector, tested against a mock transport built from the official API contract. Live testing against an authorized Quickbase test app is a separate, operator-gated step (C3). C3 passed on 2026-10-09 (§22.18).
 
 ### 4.5 Non-goals
 
@@ -1079,9 +1079,13 @@ The portal `developer.quickbase.com` renders only with JavaScript. On 2026-10-09
 | Errors are 4xx/5xx with `{message, description}`; a 2xx may still carry partial errors (`lineErrors`, on writes) | verified, primary | QB-ER |
 | Limit of 100 requests per 10 seconds per user token; throttled responses are 429 with `retry-after`; retry only 429 with backoff, back off on 5xx and connectivity errors, never retry other 4xx | verified, primary in the v2.0 pass; absent from the OpenAPI document | S6 |
 | `recordsModifiedSince` and `getRoles` require app-admin permission | verified, primary; **not used**, for least privilege | QB-OAS |
-| Built-in field 2 is Date Modified (`timestamp`); fields 1, 4 and 5 are Date Created, Record Owner and Last Modified By | **unverified**; C2 checks field 2's `fieldType` | — |
-| `getFields` `fieldType` names `text-multiple-choice`, `user`, `file`, `recordid` | **unverified** (`text`, `numeric`, `timestamp` and `checkbox` appear in the formula-type enum); C2 compares every mapped field against the live list, so a wrong name fails loudly with the observed value | — |
-| The `{3.GT.<n>}` comparison on Record ID# in a `where` string | **unverified**; C3 confirms it. If it is refused, capture falls back to `skip` paging with per-page total accounting | — |
+| Built-in field 2 is Date Modified (`timestamp`); fields 1, 4 and 5 are Date Created, Record Owner and Last Modified By | **verified live** (C3): 1 and 2 `timestamp`, 3 `recordid`, 4 and 5 `user` | C3 (§22.18) |
+| `getFields` `fieldType` names `text-multiple-choice`, `user`, `file`, `recordid` | **verified live** (C3), together with `text`, `numeric`, `checkbox` and `timestamp` | C3 (§22.18) |
+| The `{3.GT.<n>}` comparison on Record ID# in a `where` string | **verified live** (C3): the realm accepted it, so capture paged by keyset on every table. The `skip` fallback stays in place for realms that refuse it | C3 (§22.18) |
+| `createField` with `fieldType` `timestamp` creates a field that `getFields` reports as `timestamp` | **verified live** (C3) | C3 (§22.18) |
+| A user token works only in the realm where it was created; elsewhere the API answers 401 "User token is invalid" | **verified live** (C3) | C3 (§22.18) |
+| `createApp` needs app-creation rights. A plain registration in `login.quickbase.com` gets 403 "Insufficient permissions"; a free trial gives a realm whose admin can create apps | **verified live** (C3) | C3 (§22.18) |
+| A relationship adds two fields to its **parent** table: a report link (`dblink`) and an "add child" formula (`url`). They take the parent's next free ids | **verified live** (C3) | C3 (§22.18) |
 
 ### 12.2 Export format
 
@@ -2171,6 +2175,7 @@ Every change adopted after v3.0 is recorded here, each with its decision in `doc
 | AM-9 | §22.15 | D-015 | a spec-only review of the output surfaces |
 | AM-10 | §22.16 | D-016 | the pre-publication go/no-go review |
 | AM-11 | §22.17 | D-017 | preparing C3: a builder for Appendix D |
+| AM-12 | §22.18 | D-018 | the C3 live verification |
 
 AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
@@ -2432,5 +2437,39 @@ The tool's tests build against a fake realm that enforces the OpenAPI request sh
 One question only a live realm can answer: the builder creates Date/Time fields as `timestamp`, which the OpenAPI enum allows and §12.3 expects, while the API portal's example uses `datetime`. If a realm refuses `timestamp` or reports another type, the build stops at that field, before any record exists, and says why.
 
 An independent review of the builder also found one defect in the package. `capture-quickbase` echoed `token_env` in `QB_TOKEN_MISSING` and in its validation error, so a token pasted there in place of a variable's name was printed. A user token is lower case. A `token_env` value is now shown only when it is an upper-case name, and a validation error never shows it (I-7).
+
+---
+
+### 22.18 Amendment AM-12: the C3 live verification (decision D-018)
+
+Step C3 ran on 2026-10-09, at `main` `4429754`, in a Quickbase free-trial realm that belongs to the operator. It followed `docs/c3-runbook.md`: the fast path, then step 7.
+
+| step | result |
+|---|---|
+| build (`tools/qb_build_test_app.py --yes`) | one new app with 4 tables; all 29 field ids equal the demo mapping's; 200 records and 80 files, in 42 requests |
+| `capture-quickbase` | keyset paging on all 4 tables; 80 of 80 files captured. Every dataset is `complete_for_declared_scope` on the bases `query_total_matched`, `two_pass_stable` and `operator_attestation`, with consistency `stable_verified` |
+| `assess` | `READY_FOR_REVIEW`; 207 of 207 findings PASS |
+| `compare` with S01 | no finding added or removed, and none changed in outcome or reason. Four R1 dataset findings differ only in `observed` and `explanation`, because the coverage basis legitimately differs (D-005) |
+
+**Checkpoint C (§18.1) is reached.** The accurate description is: "a read-only connector tested against a controlled Quickbase test app on 2026-10-09 (a free-trial realm, with the Appendix D app built by `tools/qb_build_test_app.py`; keyset paging; completeness earned on all three bases)."
+
+**What the realm settled:**
+- the three facts of §12.1 that were unverified, plus four new ones (§12.1);
+- AM-11's open question: `createField` accepts `timestamp`, and `getFields` reports it as `timestamp`;
+- the Record Owner comes back in `fieldsToReturn`, so Decided By defaulted to the token's user, as AM-11 intends;
+- the parent-first creation order is necessary as well as sufficient. A relationship adds a report link and an "add child" formula to its parent table, and they take ids after the parent's own fields, so the mapped ids held.
+
+**Two refusals came first.** Both were handled as AM-11 designed: `QB_PERMISSION`, nothing created, and no claim that an app may exist.
+- A token created in `login.quickbase.com` gave 401 in the trial realm.
+- The plain `login.quickbase.com` registration gave 403 on `createApp`.
+
+The runbook now says to start a free trial and to create the token in that realm.
+
+**Not covered by this run** (also in `docs/limitations.md`):
+- **The least-privilege "Reconcile Reader" role.** The capture used the builder's token, which owns the app, and its attestation says so.
+- **Untested paths:** the `skip` paging fallback, tables longer than one page, files near `max_file_bytes`, and throttling. The run stayed far below the rate limit.
+- **The sanitized responses as a committed fixture** (§16.3, C3). The raw capture stays in the operator's gitignored `local/` directory.
+
+Public records of the run name no realm, app, table or user (runbook §8).
 
 *End of specification v3.0.*

@@ -17,8 +17,16 @@ uv sync --extra quickbase
 
 ## Fast path: build the app with one command
 
-`tools/qb_build_test_app.py` replaces steps 1 to 6. You need a Quickbase account in which you may create apps,
-and a user token for your own user.
+`tools/qb_build_test_app.py` replaces steps 1 to 6. You need a Quickbase realm in which you may create apps, and a
+user token for your own user, made in that realm:
+- **A plain registration cannot create apps.** An account registered at `login.quickbase.com` has no realm of its
+  own, and `createApp` answers 403 "Insufficient permissions". Start a free trial at
+  https://www.quickbase.com/trial-register. It gives you a realm, such as `yourname.quickbase.com`, whose admin can
+  create apps.
+- **A token works only in the realm where you made it.** In any other realm the API answers 401 "User token is
+  invalid". Sign in to the trial realm, then create the token under your profile's "Manage my user tokens".
+
+Either refusal stops the builder before anything is created, and it says so.
 
 1. Put the token in the environment, as in step 5:
 
@@ -136,6 +144,9 @@ uv run python -c "import json; c = json.load(open('local/c3/compare.json')); pri
 This prints `[] [] []`.
 
 ## 8. Record the result
+
+The first live run, on 2026-10-09, is recorded in SPEC §22.18, `docs/limitations.md` and `docs/status.md`. For a
+later run, record the same things:
 
 - **What to record:**
   - the date;

@@ -205,10 +205,12 @@ uv run inspection-reconcile capture-quickbase --config local/qb-capture.yml \
     --mapping local/quickbase-live.yml --out out/capture
 ```
 
-**Status:** tested against a mock Quickbase app that follows the published OpenAPI contract. A capture of that mock
-app gives the same finding for every requirement as the canonical scenario. The capture has **not yet run against
-a live Quickbase app**. [docs/c3-runbook.md](docs/c3-runbook.md) walks through that step with a test app built
-from Appendix D of the spec.
+**Status: verified against a live Quickbase app on 2026-10-09** (step C3). In a free-trial realm, the builder made
+the Appendix D test app, with every field ID as mapped. The read-only capture paged by keyset, got 80 of 80 files
+and earned completeness on all three bases. The assessment gave `READY_FOR_REVIEW`, 207 of 207 findings PASS: the
+same outcome and reason for every requirement as the canonical scenario S01. Before that, the client was tested
+against a mock Quickbase app that follows the published OpenAPI contract. [docs/c3-runbook.md](docs/c3-runbook.md)
+walks through the run, and [docs/limitations.md](docs/limitations.md) lists what one live run does not cover.
 
 ## How it is tested
 
