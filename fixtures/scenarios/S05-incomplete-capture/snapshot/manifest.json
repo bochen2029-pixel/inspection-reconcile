@@ -1,0 +1,60 @@
+{
+  "format": "inspection-reconcile/snapshot/v1",
+  "snapshot_id": "NC-001-S05-incomplete-capture",
+  "synthetic": true,
+  "source": {
+    "system": "fixture",
+    "description": "North Creek synthetic baseline"
+  },
+  "capture": {
+    "started_at": "2026-10-01T17:55:00Z",
+    "ended_at": "2026-10-01T18:00:00Z"
+  },
+  "scope": {
+    "file": "scope.csv",
+    "scope_revision": "S1",
+    "accepted": {
+      "by": "Synthetic Client Records Dept",
+      "at": "2026-08-15T14:00:00Z",
+      "reference": "SYN-SCOPE-S1"
+    }
+  },
+  "datasets": {
+    "inspections": {
+      "file": "inspections.csv",
+      "coverage": "partial",
+      "basis": [
+        "extraction_interrupted"
+      ],
+      "consistency": "not_applicable"
+    },
+    "artifacts": {
+      "file": "artifacts.csv",
+      "coverage": "partial",
+      "basis": [
+        "extraction_interrupted"
+      ],
+      "consistency": "not_applicable"
+    },
+    "approvals": {
+      "file": "approvals.csv",
+      "coverage": "partial",
+      "basis": [
+        "extraction_interrupted"
+      ],
+      "consistency": "not_applicable"
+    },
+    "evidence_files": {
+      "dir": "evidence",
+      "coverage": "partial",
+      "basis": [
+        "extraction_interrupted"
+      ],
+      "consistency": "not_applicable"
+    }
+  },
+  "optional_datasets": {
+    "approval_items": null
+  },
+  "normalization": null
+}

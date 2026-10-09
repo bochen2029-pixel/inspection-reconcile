@@ -1,0 +1,1014 @@
+{
+  "format": "inspection-reconcile/qb-export/v1",
+  "export_id": "NC-001-S17-quickbase-unmapped-value",
+  "synthetic": true,
+  "source": {
+    "system": "quickbase",
+    "realm_hostname": "synthetic.quickbase.invalid",
+    "app_id": "bsyn00000",
+    "description": "North Creek synthetic Quickbase-shaped export"
+  },
+  "capture": {
+    "started_at": "2026-10-01T17:55:00Z",
+    "ended_at": "2026-10-01T18:00:00Z"
+  },
+  "scope": {
+    "scope_revision": "S1",
+    "accepted": {
+      "by": "Synthetic Client Records Dept",
+      "at": "2026-08-15T14:00:00Z",
+      "reference": "SYN-SCOPE-S1"
+    }
+  },
+  "tables": {
+    "obligations": {
+      "table_id": "bsyn00001",
+      "select": [
+        2,
+        3,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "where": "{7.EX.'NC-001'}",
+      "pages": 1,
+      "total_records": 40,
+      "retrieved": 40,
+      "two_pass": "not_run"
+    },
+    "inspections": {
+      "table_id": "bsyn00002",
+      "select": [
+        2,
+        3,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "where": null,
+      "pages": 1,
+      "total_records": 40,
+      "retrieved": 40,
+      "two_pass": "not_run"
+    },
+    "artifacts": {
+      "table_id": "bsyn00003",
+      "select": [
+        2,
+        3,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "where": null,
+      "pages": 1,
+      "total_records": 80,
+      "retrieved": 80,
+      "two_pass": "not_run"
+    },
+    "approvals": {
+      "table_id": "bsyn00004",
+      "select": [
+        2,
+        3,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "where": null,
+      "pages": 1,
+      "total_records": 40,
+      "retrieved": 40,
+      "two_pass": "not_run"
+    }
+  },
+  "datasets": {
+    "inspections": {
+      "coverage": "complete_for_declared_scope",
+      "basis": [
+        "synthetic_universe"
+      ],
+      "consistency": "not_applicable"
+    },
+    "artifacts": {
+      "coverage": "complete_for_declared_scope",
+      "basis": [
+        "synthetic_universe"
+      ],
+      "consistency": "not_applicable"
+    },
+    "approvals": {
+      "coverage": "complete_for_declared_scope",
+      "basis": [
+        "synthetic_universe"
+      ],
+      "consistency": "not_applicable"
+    },
+    "evidence_files": {
+      "coverage": "complete_for_declared_scope",
+      "basis": [
+        "synthetic_universe"
+      ],
+      "consistency": "not_applicable"
+    }
+  },
+  "files": [
+    {
+      "table_id": "bsyn00003",
+      "record_id": 201,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/201/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "bfafb7ddbb71c9a468a88bc7e61b2151bb337f33e44a652f3a72f6412e9fcb28",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 202,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/202/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "14e2f9ba2bf3bfecf24618d6be0387d667f7a3ed932ddaceefb0f5a1f6d90c99",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 203,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/203/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "bd4a98b8c53b554ae77603fd203d7d256aa86e9964cfeaf93919b51ab7a8a4bf",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 204,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/204/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "f2d77f0bd4cbdc0ef2c6e4ff4191cb0f72de4a34f276caef9f6456941454a023",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 205,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/205/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "e9053760ce29a66f0484b1ca66e9b530a075faaff454203903cdbfc09b5ceb1b",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 206,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/206/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "b824840b93451b791726244fc4096590fa4deef873b191ece3134d6e2736e913",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 207,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/207/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "380164355ea75f7b10eda7909acaa2420470855ee33a275cd7a100bd89e4fd5b",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 208,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/208/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "e9d31c021ea7a6fca32d3b6b301540e5ea5c28fa34103ef0b3d5755b61a213f8",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 209,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/209/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "40c491687455839c8acd0cf9e9f85e193f480f24399014cc7cd8ada6fb47f796",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 210,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/210/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "6002b78b735c50fd7101a5f3351d5b269bf47266ca732c5f9c9554ef1ec197a7",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 211,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/211/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "ca767ae0db2ca03b13ba04bfc0053011b719609786e2beac1a7c75b24ed1b80d",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 212,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/212/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "b6f3ff6cbe43eb8315c31ea78d0384f41b66659540997bff8569d3ce58d1a724",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 213,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/213/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "41e6c8428532dc5bc553badd9979909f65c7b407abab026534ec831766f8dec5",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 214,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/214/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "550bedb0d43eca352d4b04a151fc6a37f6d25db387c5a3879184410e59f19966",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 215,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/215/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "08564d0b3e8dcfa00d01c29b42891e450438ac586023ca58d43c77dd75d9afa9",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 216,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/216/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "4a0b547cda26a8cdc031bb0022e04a94ac081d215fbd0e487be3ee6c802db09a",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 217,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/217/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "af8ba57ead46897662dcec10ae82ac13a46c98684b9044d67c0109ae5833b203",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 218,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/218/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "9742dcdf22a452e772bdfd15d63b13819a91c82a8ee9dadc70887700119e0330",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 219,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/219/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "aa5922d1292f27faea2b2269d59c28bc3cf7d5cba6026ffc10f11343a3076fa0",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 220,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/220/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "6a2fe04d7702f3bb1e121830ebc0e5f644e5d19ea61de030c07346dee4ce05ba",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 221,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/221/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "0ed38c40eb36856d162a1882605ca028249cf277beeb9065fc9f23c3b6ddfba8",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 222,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/222/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "58cf1ce1cb52c0eb418f6c7def90bef4d1819f10e98fb380003564f753342a15",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 223,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/223/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "dbbfc0d4d9e1da013b287a7b2b961e4dd378e0122f7a8fdb24e4b36f38f45c77",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 224,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/224/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "c55fae4b4d0489526ab21ff669df6c15c8c1ccbb1ef6fcd8a75bd8158cbc1c2c",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 225,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/225/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "dc49c818b1651df644d2d4229252d6d7852531589787b624d280a0c66cf5564e",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 226,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/226/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "9d7e2127a30969dd38876b7681fa5c095238f15fa2113cb46730fbc1adc15eef",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 227,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/227/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "394884fd3f489ed2c45d8860258c32e03d961657cf03266c7785407d2f3e1498",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 228,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/228/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "1b316a18a44adf1058c90f2aed310f3a637f4819dbda93c3fb806bf47346e7c3",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 229,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/229/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "91e928cced30242c8abbac20129d1f9a22b6011bb9bd981523f8cd05c6badeda",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 230,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/230/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "435364570de1c25844a625979e31f017e1737f19220c03aa9864e6dcb768b3b2",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 231,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/231/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "da927d6186ba659eccbe95557f816689e566f75b38e910a62645f760de5d7d49",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 232,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/232/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "33ddc9e6e3ad9c2263bdbe7bd2180747407705413c40a82b025b7ec7ae456cff",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 233,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/233/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "a1fcd75f08f098c0424e22c66e23a733dae6796580b65fb1a0a1dae046cd0b6e",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 234,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/234/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "846bddd95c35775720a5d68220cb0a3c350362f0d3e3aafd28e184e4348f8103",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 235,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/235/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "a9b8cc9b29ffd9cbb765b6cdbe4b30662e5180588555bdbd2eb7d2869b62f068",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 236,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/236/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "b820b1580893303672c48ae883aa008c54ea42f475bbc175e1073923e9f2fcc7",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 237,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/237/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "094cba663ec39752067b42c7b988577e5c64cfe64edb3b9340171e77a0da2632",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 238,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/238/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "88fb5436bd2feb9327bcfe747b7c892e7fd4c458445364b28f961f99fbbf2e59",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 239,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/239/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "8a07c850c9f0102f32c7c3dde8ee822721219689645ed898d5b338e61aed606f",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 240,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/240/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "a865e590f8154dbed8ee56b606650258a2c9ca0f6ee84244863e1cceb627b104",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 241,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/241/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "ea35594489e8c6907633e338fb4dbaf889ae5d4a2aac35664fba8f29e616cb9d",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 242,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/242/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "e037d34060fe8510bfd9598afaf550430ab2ce6c47d7ec2618ccc48219beb982",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 243,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/243/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "af47b9f3d3a9ba91ddd0175627981ddc59c5315cd5b0adde572f5158bbbb65f3",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 244,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/244/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "3514c7079ef90db7235feaae82246c7d12f753eef3c8b0223912705ddf48fa64",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 245,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/245/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "c73a37377e34f867bb3c56cd1dbb29ec462d1247245da08079d62f5411756c54",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 246,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/246/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "517f19b9dfb2f19325d60011c86c858a61f4f4576d5a5c5ddff748c4675b044c",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 247,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/247/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "dbaad54777c537422c4a72847bf13a3bb73902ab70c9c288ba2ff90cf13a06f3",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 248,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/248/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "07a3842e4bfb9707f3c0eeebc90d9341d62d92d26b6248c21146667abcd8d725",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 249,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/249/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "1f5f632893e14eee2749ac2fb766d83e3c2c8c57220b73b91ad6bd3f2090a1ac",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 250,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/250/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "d660f50000d887272c158ba891127011a26ea7a5b8b4af8f535d82fdebe29bdd",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 251,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/251/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "3645bfaa8eb820ac36ad6fffa53b5f0086f6a889ae7e61717d35c852d5c31359",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 252,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/252/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "c37278196853268ff179be1e6f8da81e026789435e8665d2ee591db79b3a9efc",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 253,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/253/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "92231fb4f1e5c76d93288c9d79baed03dced48e15d2721be569a89d7e17fd4ab",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 254,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/254/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "0e38716c2d9ba5957b8601dd5362b2bf2614f944f9bb373a0b5662dc6922e9a5",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 255,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/255/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "8724daa218962b35075726df9f94fed1fa2f634da64dd0ab90ea81cbdd17fbe8",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 256,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/256/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "4935a6897b9724fbfdb93c26f850ad9421e32a12a6816bd6e37ff80737c180ae",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 257,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/257/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "9292a474da8e7fa3997726a63df1f0472fbb2264a570c62b4682267bfcd82327",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 258,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/258/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "c7337d3b01773d31f2aaed33f2faf91bff787e5f15798231ca91e3fd56c594ca",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 259,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/259/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "4de786792327d1b24b7868f7b4ae9fc258e4649f591cfb1bcda73aa59aacd672",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 260,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/260/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "2ddde15b7be14248e481b33ee957effc005bc4abe36086120ab753c644a51f66",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 261,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/261/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "33becf047702b86877f262ec5075e303761cd50b9c9254cef89946a68934ec4a",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 262,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/262/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "ee3bd377ef454dd1e280d9cc2079e62c868bfaf55291dc512324f42efac7b4b2",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 263,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/263/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "77a50fa7fd16d7ac3e0424303db6e43715d57b40b1448252de7bb6324f3bd051",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 264,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/264/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "db3e1fde2df7545d87a0cc9dfccdddd011551d7ecb29f18b6076e9d25e04ee54",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 265,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/265/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "bcd98a9b44319d81ab6b4104a0d2465bac2fbb513206e736a36688e59585eab7",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 266,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/266/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "23f48422208d05ecadfe51e8231e4367a2fefa48843a1f696ddef8cb2347cd31",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 267,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/267/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "c9af45b50011b7e65ef22a23e038014870c55c268880f76188cf8efeeccd6a08",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 268,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/268/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "c9d0c3a1c3f2fdac400a032a2f535f915e72cab522eab1d5f3789e766a7ff492",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 269,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/269/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "b54ec4edd6463f491da5c1b7baf2a9056ba3d75fbc08e7fe60e2f8f40d3d42aa",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 270,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/270/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "f8f4ed3290cb04827da7a6ceca4ba5d7df77ed406e75a01fd948c952d432cccb",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 271,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/271/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "17f90b66b67f1dab7540bcd574ecef7d074fc5042e86036d1040c602c4f7bac1",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 272,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/272/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "563ed694c5260e563ef77bb385b307620dc019e0b234d7e5df9c6cc0633ba6d7",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 273,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/273/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "c5d4e19af2323762797249ee4e42ba1b2d5029c0e9d747a3a47a564f40583b14",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 274,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/274/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "a859fba2b85a1570fed1ef0f131ced81d2dccfa04175cf5e3baf4356bf881fd5",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 275,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/275/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "d1ff0149bef4ee9fec1c19d94e9ca2c62f6540255613975c4fdd4038ba075252",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 276,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/276/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "0589fd4f90bf12ae60730a55c8b9d7e591e354b96adc4040c9ba459d3ac31083",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 277,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/277/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "8210ca5afdf746da3e2abfff4a9f464a9a59ee9ac456f84cfdbe9531f0ecfd8b",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 278,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/278/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "ec5b492172a5376f98309f1e38fc51780a4b6df97bd3a759ff0f91fc835f4fe8",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 279,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "report.pdf",
+      "path": "files/bsyn00003/279/13/v1/report.pdf",
+      "bytes": 713,
+      "sha256": "39fa942467803d95ca486224e742626c9a78abd56f7052e1850a4fd1f85ee96e",
+      "status": "captured"
+    },
+    {
+      "table_id": "bsyn00003",
+      "record_id": 280,
+      "field_id": 13,
+      "version": 1,
+      "file_name": "photo.png",
+      "path": "files/bsyn00003/280/13/v1/photo.png",
+      "bytes": 656,
+      "sha256": "a53856156b370099141be1bbfcf04559e3c251df6029b3e4012a656d11c4ccfa",
+      "status": "captured"
+    }
+  ]
+}

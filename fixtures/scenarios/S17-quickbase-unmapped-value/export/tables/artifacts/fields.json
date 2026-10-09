@@ -1,0 +1,92 @@
+[
+  {
+    "id": 2,
+    "label": "Date Modified",
+    "fieldType": "timestamp",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 3,
+    "label": "Record ID#",
+    "fieldType": "recordid",
+    "mode": "",
+    "required": false,
+    "unique": true,
+    "properties": {}
+  },
+  {
+    "id": 6,
+    "label": "Artifact ID",
+    "fieldType": "text",
+    "mode": "",
+    "required": true,
+    "unique": true,
+    "properties": {}
+  },
+  {
+    "id": 7,
+    "label": "Revision",
+    "fieldType": "numeric",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 8,
+    "label": "Is Current",
+    "fieldType": "checkbox",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 9,
+    "label": "Related Inspection",
+    "fieldType": "numeric",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 10,
+    "label": "Project ID",
+    "fieldType": "text",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 11,
+    "label": "Asset ID",
+    "fieldType": "text",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 12,
+    "label": "Document Kind",
+    "fieldType": "text-multiple-choice",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 13,
+    "label": "File",
+    "fieldType": "file",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  }
+]

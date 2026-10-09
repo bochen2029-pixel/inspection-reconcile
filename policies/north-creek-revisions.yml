@@ -1,0 +1,29 @@
+# Demonstration requirement pack that accepts revision binding (SPEC §6.1, §7.11).
+# Revision binding cannot detect byte changes under an unchanged revision label.
+schema: inspection-reconcile/policy/v1
+pack_id: north-creek-revisions
+version: "3.0.0"
+effective_from: "2026-09-01"
+synthetic: true
+project_id: NC-001
+scope_revision: S1
+coverage:
+  accepted_bases:
+    - [synthetic_universe]
+    - [query_total_matched, two_pass_stable, operator_attestation]
+requirements:
+  visual_inspection:
+    document_kinds: [inspection_report, photo]
+approval:
+  required_binding: revisions
+limits:
+  max_file_bytes: 104857600
+checks:
+  - {id: R0, type: input_integrity,        required: true}
+  - {id: R1, type: scope_and_coverage,     required: true}
+  - {id: R2, type: inspection_cardinality, required: true}
+  - {id: R3, type: identity_consistency,   required: true}
+  - {id: R4, type: required_artifacts,     required: true}
+  - {id: R5, type: artifact_availability,  required: true}
+  - {id: R6, type: approval_binding,       required: true}
+  - {id: R7, type: unmatched_records,      required: false}

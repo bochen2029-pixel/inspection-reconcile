@@ -1,0 +1,83 @@
+[
+  {
+    "id": 2,
+    "label": "Date Modified",
+    "fieldType": "timestamp",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 3,
+    "label": "Record ID#",
+    "fieldType": "recordid",
+    "mode": "",
+    "required": false,
+    "unique": true,
+    "properties": {}
+  },
+  {
+    "id": 6,
+    "label": "Approval ID",
+    "fieldType": "text",
+    "mode": "",
+    "required": true,
+    "unique": true,
+    "properties": {}
+  },
+  {
+    "id": 7,
+    "label": "Related Inspection",
+    "fieldType": "numeric",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 8,
+    "label": "Inspection Revision",
+    "fieldType": "numeric",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 9,
+    "label": "Evidence Digest",
+    "fieldType": "text",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 10,
+    "label": "Decision",
+    "fieldType": "text-multiple-choice",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 11,
+    "label": "Decided At",
+    "fieldType": "timestamp",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  },
+  {
+    "id": 12,
+    "label": "Decided By",
+    "fieldType": "user",
+    "mode": "",
+    "required": false,
+    "unique": false,
+    "properties": {}
+  }
+]
