@@ -124,3 +124,14 @@ memory, before being marked `too_large`. A huge attachment could end the run ins
   stopped early leaves it null.
 
 Helper task T5 implemented this, with 36 tests, and it was reviewed before the merge.
+
+## D-014 · 2026-10-09 · Amendment AM-8: foundations review corrections (SPEC §5.4, §6.2, §7.5.1, §22.14)
+A spec-only review of the canonical JSON, the grammars, the YAML loader, the policy, the snapshot loader and the
+probe found them exact, apart from two defects:
+- **CSV records.** One defective CSV record aborted the whole run. This contradicted §7.14, under which a defective
+  record is never a run error. It now becomes `MALFORMED_ROW`, and reading resumes.
+- **YAML integers.** YAML 1.1 integer forms silently changed configuration numbers: `fid: 010` became field 8.
+  Integers are now plain decimal.
+
+The reviewer's patch added 18 tests, 12 of which fail without it. The review's notes on record numbering,
+`field_count`, `-00:00` and the probe's time-of-check gap are recorded in the spec and in `docs/limitations.md`.

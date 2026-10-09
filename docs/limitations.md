@@ -30,6 +30,9 @@ is used anywhere in the repository.
 - **Fixed cardinality.** Exactly one current, completed inspection per obligation; repeat inspections need a
   supersession rule.
 - **Full-table capture.** Scoped capture with reference closure is specified but not implemented (SPEC §12.7).
+- **A local, trusted evidence root.** The probe refuses links found while it resolves a path. A file that is swapped
+  for a link between resolution and reading would still be followed. The evidence root is assumed to be a local
+  directory that only the operator controls.
 
 ## Never claimed
 "Production-ready", "compliance", that any organization uses the tool, or any runtime, accuracy or labor-saving

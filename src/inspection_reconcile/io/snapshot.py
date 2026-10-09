@@ -149,9 +149,17 @@ def read_csv(path: Path, dataset: str, file_name: str) -> tuple[tuple[RawRow, ..
         text = data.decode("utf-8-sig")  # strips a leading byte-order mark
     except UnicodeDecodeError as exc:
         raise RunError("CSV_UNREADABLE", f"{file_name}: not valid UTF-8") from exc
-    reader = csv.reader(io.StringIO(text, newline=""), strict=True)
+    lines = _RecordLines(text)
+    reader = csv.reader(lines, strict=True)
+    limit = csv.field_size_limit()
+    # A long cell is a record defect that its grammar reports (§7.5.1), not a reader failure: lift the csv
+    # module's default 128 KiB field limit for this read. No field can be longer than the text.
+    csv.field_size_limit(max(limit, len(text) + 1))
     try:
-        header = next(reader, None)
+        try:
+            header = next(reader, None)
+        except csv.Error as exc:
+            raise RunError("CSV_UNREADABLE", f"{file_name}: the header row: {exc}") from exc
         if header is None:
             raise RunError("CSV_UNREADABLE", f"{file_name}: empty file (no header)")
         schema_cols = [c for c, _, _ in SCHEMAS[dataset]]
@@ -167,7 +175,20 @@ def read_csv(path: Path, dataset: str, file_name: str) -> tuple[tuple[RawRow, ..
             raise RunError("CSV_HEADER_INVALID", f"{file_name}: missing column(s) {', '.join(missing)}")
         rows: list[RawRow] = []
         number = 1
-        for fields in reader:
+        while True:
+            lines.record = []
+            try:
+                fields = next(reader)
+            except StopIteration:
+                break
+            except csv.Error:
+                # A record the reader cannot parse (a quote error, an unterminated quoted field) is a defective
+                # record, never a run error (§7.14): R0 reports it as MALFORMED_ROW, its one raw cell the verbatim
+                # text, and reading resumes at the next line.
+                number += 1
+                verbatim = "".join(lines.record).rstrip("\r\n")
+                rows.append(RawRow(dataset, file_name, number, None, {}, (verbatim,), len(header)))
+                continue
             if not fields:
                 continue  # a blank line is not a record (SPEC §5.4)
             number += 1
@@ -178,9 +199,28 @@ def read_csv(path: Path, dataset: str, file_name: str) -> tuple[tuple[RawRow, ..
             cells = {c: values[c] for c in schema_cols}
             extras = {h: values[h] for h in header if h.startswith("x_")}
             rows.append(RawRow(dataset, file_name, number, cells, extras, tuple(fields), len(header)))
-    except csv.Error as exc:
-        raise RunError("CSV_UNREADABLE", f"{file_name}: {exc}") from exc
+    finally:
+        csv.field_size_limit(limit)
     return tuple(rows), data
+
+
+class _RecordLines:
+    """Feeds ``csv.reader`` one physical line at a time (``newline=""`` semantics) and keeps the lines of the
+    record being parsed, so that a record the csv module cannot parse can be kept verbatim."""
+
+    def __init__(self, text: str) -> None:
+        self._source = io.StringIO(text, newline="")
+        self.record: list[str] = []
+
+    def __iter__(self) -> _RecordLines:
+        return self
+
+    def __next__(self) -> str:
+        line = self._source.readline()
+        if not line:
+            raise StopIteration
+        self.record.append(line)
+        return line
 
 
 # ---------------------------------------------------------------------------------------- manifest

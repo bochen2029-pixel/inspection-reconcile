@@ -223,10 +223,12 @@ Every member is required except `scope` and `normalization`. Unknown members at 
 - **Rows.**
   - A blank line (the reader yields an empty list) is ignored.
   - A row whose field count differs from the header is not a run error: it is R0 `MALFORMED_ROW` (§7.5.1).
+  - A record the csv module cannot parse is not a run error either (AM-8). Examples are text after a closing quote, or a quoted field that never closes. It is R0 `MALFORMED_ROW`, its one raw cell is the record's verbatim text, and reading resumes at the next line. Only a parse error in the header row is a run error.
+  - Cells have no length limit at reading time; an over-long cell fails its grammar (AM-8).
   - An empty cell is `null`.
   - Values are never trimmed. Leading or trailing whitespace makes an ID, enum or timestamp invalid.
   - Booleans are exactly `true` or `false`.
-- **Locators.** Row numbers are 1-based, with the header as row 1. They appear only in locators.
+- **Locators.** Row numbers count CSV records, not physical lines: they are 1-based, with the header as row 1, and blank lines are not counted. A quoted cell can span lines, so the two can differ (AM-8). Row numbers appear only in locators.
 
 ### 5.5 Entities
 
@@ -404,6 +406,7 @@ All YAML (policies, mappings, capture configuration, the oracle) is loaded with 
 - **Rejects duplicate keys** in any mapping;
 - **Rejects aliases, anchors and explicit tags;**
 - **Rejects non-string keys** where a string key is expected. For example, an unquoted `Yes:` in a value map parses as a boolean and is rejected with "quote this key".
+- **Reads integers as plain decimal only** (an optional sign, no leading zeros) (AM-8). YAML 1.1's octal, sexagesimal, hexadecimal, binary and underscore forms (`0100`, `1:30`, `0x64`, `0b11`, `1_000`) load as strings. A validator then rejects them where an integer is expected, instead of silently using another number.
 
 The policy SHA-256 (§8.5) is computed over the canonical JSON of the parsed document, so comments and formatting do not change it.
 
@@ -463,7 +466,7 @@ R0 runs in the fixed order below. Each step sees the quarantine decisions of the
 
 #### 7.5.1 Row validation
 
-- **`MALFORMED_ROW` (UNKNOWN).** A row whose field count differs from the header. The row is quarantined and unattributable. Identical malformed rows in one dataset merge into one finding with `observed.count`.
+- **`MALFORMED_ROW` (UNKNOWN).** A row whose field count differs from the header, or a record the csv module cannot parse. The latter has `field_count` 1, because its one raw cell is the verbatim text (AM-8). The row is quarantined and unattributable. Identical malformed rows in one dataset merge into one finding with `observed.count`.
 - **Cell validation.** Every other row has each schema column checked against its type, its required rule and its enum. Each violation is classified:
   - `INVALID_PATH` for a `relative_path` grammar violation;
   - `UNMAPPED_VALUE` for a cell that the snapshot's normalization file lists as unmapped (§12.3), even when the cell satisfies its grammar (AM-7);
@@ -861,7 +864,7 @@ The order-invariance property (P1) compares `evaluation_id` and `assessment_sema
  mapping: null | {mapping_id, version, sha256}}
 ```
 
-This is the only output that holds wall-clock and platform facts. It is excluded from every identity.
+This is the only output that holds wall-clock and platform facts. It is excluded from every identity. `inputs[].sha256` is bare lowercase hex, like every content digest in a member named `sha256` (§8.3, §8.4). `policy.sha256` and `mapping.sha256` are digest references, `sha256:<hex>` (§8.1) (AM-9).
 
 ### 9.4 `report.html`
 
@@ -2132,6 +2135,7 @@ Every change adopted after v3.0 is recorded here, each with its decision in `doc
 | AM-5 | §22.11 | D-009 | a spec-only engine review |
 | AM-6 | §22.12 | D-011 | preparing C3 |
 | AM-7 | §22.13 | D-012 | a spec-only adapter review |
+| AM-8 | §22.14 | D-014 | a spec-only review of the foundations |
 
 AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
@@ -2306,5 +2310,19 @@ A spec-only review of the four adapter modules reproduced each defect below thro
 - **A listed unmapped cell is always a violation (§7.5.1).** It reports `UNMAPPED_VALUE` even when it satisfies the column grammar. Before, a label such as `photo`, when the map knows only `Photo`, passed as a valid kind.
 - **Unexpected JSON types (§12.3 Conversions).** They are listed as unmapped too. Before, `123` in a text field became a valid ID, and `1.5` a valid revision. The rule still holds at the source: `verify_fields` pins each field type, and Quickbase returns the documented JSON types.
 - **The file list is closed-world.** A record's latest file version with no `files[]` entry is refused (`EXPORT_INVALID`). Before, it became a `FILE_ABSENT` FAIL under complete evidence coverage.
+
+---
+
+### 22.14 Amendment AM-8: foundations review corrections (decision D-014)
+
+A spec-only review covered the canonical JSON, the grammars, the YAML loader and validators, the policy, the snapshot loader and the evidence probe. It found everything exact except two defects, each reproduced and each now with regression tests:
+
+- **A defective CSV record is never a run error (§5.4, §7.14).** Before, one record the csv module could not parse aborted the whole run (exit 2) with `CSV_UNREADABLE`. Examples are text after a closing quote, an unterminated quoted field, and a cell over the module's default 128 KiB limit. Now such a record is R0 `MALFORMED_ROW` with its verbatim text as its one raw cell, and reading resumes at the next line. Cells have no length limit at reading time. Only bad UTF-8, a NUL byte and header violations, including a parse error in the header row, make a CSV unreadable.
+- **Configuration integers are plain decimal (§6.2).** YAML 1.1 silently read `fid: 010` as field 8 and `0100` as 64. Every other integer form now loads as a string, which the validators reject where an integer is expected.
+- **Clarifications:**
+  - Locators count CSV records, not lines (§5.4).
+  - An unparseable record reports `field_count` 1 (§7.5.1).
+  - The TS offset `-00:00` is accepted and means UTC (RFC 3339's "unknown local offset").
+  - YAML diagnostics name the file's full path.
 
 *End of specification v3.0.*
