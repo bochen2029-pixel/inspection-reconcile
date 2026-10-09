@@ -860,9 +860,22 @@ The order-invariance property (P1) compares `evaluation_id` and `assessment_sema
 ```
 {schema: "inspection-reconcile/run-manifest/v1", evaluation_id, provenance_id, engine, python_version,
  platform, generated_at, as_of, policy: {pack_id, version, sha256},
- inputs: [{role, path (relative to the current directory when possible, else absolute), bytes, sha256}],
+ inputs: [{role, path, bytes, sha256}] in order of (role, path),
  mapping: null | {mapping_id, version, sha256}}
 ```
+
+**Inputs** (AM-9).
+- **`path`** is relative to the current directory when possible, else absolute. It is `null` for a file that existed only in a temporary directory that the run removed: the normalized snapshot of `assess --export` (§11).
+- **Roles:**
+  - the snapshot's files: `manifest`, `project`, `scope`, `inspections`, `artifacts`, `approvals`, `approval_items`, `normalization`;
+  - `policy`, whose size and digest are those of the bytes that were parsed (a single read);
+  - for a run that normalizes an export (`assess --export`, or a `demo` export scenario), three more roles:
+    - `export_manifest`: the export's `capture-manifest.json`;
+    - `export_table`: each `fields.json` and page file that `normalize` reads, never `pass2.json`;
+    - `mapping`: the mapping file's bytes.
+- **Captured files** are not listed, because their bytes reach the evaluation through the snapshot's evidence.
+- **`provenance_id`** covers every input (§8.5).
+- **The demo** writes an export scenario's normalized snapshot to `<out>/<scenario>/snapshot` and records its files there.
 
 This is the only output that holds wall-clock and platform facts. It is excluded from every identity. `inputs[].sha256` is bare lowercase hex, like every content digest in a member named `sha256` (§8.3, §8.4). `policy.sha256` and `mapping.sha256` are digest references, `sha256:<hex>` (§8.1) (AM-9).
 
@@ -897,9 +910,14 @@ Findings are matched by `key`. A finding has **changed** when its outcome, reaso
 
 - **Bytes only.** Outputs are encoded to UTF-8 bytes in memory, with `\n` line endings and one trailing newline. Each is written to `<name>.tmp.<pid>` in the target directory, flushed, `os.fsync`ed, and moved into place with `os.replace`. Text-mode writes are forbidden.
 - **The `--out` directory** MUST be absent or empty unless `--force` is given.
-  - With `--force`, only this tool's own output names are deleted before writing: `assessment.json`, `report.html`, `run-manifest.json`, `comparison.json`, `index.html`, `evaluation_ids.json` (D-002), and the scenario subdirectories that `demo` itself created.
-  - Nothing outside `--out` is ever deleted.
-- **Failure.** Evaluation completes in memory before any output is written. If a write fails, every file this run wrote is removed and the run exits 2.
+  - With `--force`, only the command's own output names are deleted (AM-9):
+    - `assess` and `demo`: `assessment.json`, `report.html`, `run-manifest.json`, `comparison.json`, `index.html`, `evaluation_ids.json` (D-002), and the directories `demo` creates. Those are one per oracle scenario, plus `compare-S02-S06`. A directory is recognized by its name.
+    - `normalize`: `manifest.json`, `project.json`, `scope.csv`, `inspections.csv`, `artifacts.csv`, `approvals.csv`, `approval_items.csv`, `normalization.json` and `evidence/`.
+    - `capture-quickbase`: `capture-manifest.json`, `tables/` and `files/`.
+  - `normalize` and `capture-quickbase` need `--out` to hold nothing but their own names. Anything else refuses the run (`OUT_NOT_EMPTY`) before a file is touched.
+  - Their new output is built in a staging directory inside `--out`. It replaces the previous output only when the run succeeds, so a refused or failed run leaves `--out` as it was.
+  - Symbolic links and junctions are never followed or deleted. Nothing outside `--out` is ever deleted.
+- **Failure.** Evaluation completes in memory before any output is written. If a write fails, every file this run wrote is removed, then every directory it created that is empty again. The run exits 2 (AM-9).
 
 ---
 
@@ -987,14 +1005,21 @@ inspection-reconcile --version
 inspection-reconcile validate         --snapshot DIR --policy FILE
 inspection-reconcile assess           (--snapshot DIR | --export DIR --mapping FILE) --policy FILE --out DIR [--as-of TS] [--force]
 inspection-reconcile normalize        --export DIR --mapping FILE --out DIR [--force]
-inspection-reconcile compare          --before PATH --after PATH [--out FILE]
+inspection-reconcile compare          --before PATH --after PATH [--out FILE] [--force]
 inspection-reconcile demo             (--scenario ID | --all) --out DIR [--fixtures DIR] [--force]
 inspection-reconcile evidence-digest  --snapshot DIR --policy FILE --inspection ID [--revision REV]
 inspection-reconcile export-sqlite    --snapshot DIR --policy FILE --out FILE [--force]
 inspection-reconcile capture-quickbase --config FILE --mapping FILE --out DIR [--force]
 ```
 
-- **Standard output** is one summary line, for example `BLOCKED  roots: FAIL=1 UNKNOWN=0  not_evaluated=4  evaluation_id=sha256:3f9c…`. Standard error carries diagnostics only; `--log-json` turns it into JSON lines. On Windows, `main()` reconfigures `stdout` and `stderr` to UTF-8.
+- **Standard output.**
+  - `assess` prints one summary line, for example `BLOCKED  roots: FAIL=1 UNKNOWN=0  not_evaluated=4  evaluation_id=sha256:3f9c…`.
+  - `validate`, `demo` and `evidence-digest` print what their bullets below describe (AM-9).
+  - On Windows, `main()` reconfigures `stdout` and `stderr` to UTF-8.
+- **Standard error** carries diagnostics only.
+- **`--log-json`** may be given before or after the command. With it, every diagnostic line on standard error is one JSON object `{level, code, message}`. A log record from a library module has `code: "LOG"` and adds `logger` (AM-9).
+- **`assess --snapshot` with `--mapping`** is a usage error, because `--mapping` belongs to `--export` (AM-9).
+- **`compare --out`.** An existing FILE is replaced only with `--force`. Without it the run is `OUT_EXISTS`, and a directory is `OUT_INVALID`. An `--out` that names an input of the comparison is refused even with `--force` (`COMPARE_OUT_IS_INPUT`). The inputs are `--before`, `--after`, or the `assessment.json` inside a directory argument, compared after resolving the paths (AM-9).
 - **`validate`** loads and checks every configuration file and header, and lists the record-level defects that `assess` would report under R0. It exits 0 when the inputs can be assessed, and 2 otherwise.
 - **`assess --export`** normalizes into a temporary directory, assesses it, and removes the temporary directory.
 - **`compare`** takes, for each `PATH`, an `assessment.json` or a directory that contains one.
@@ -2136,6 +2161,7 @@ Every change adopted after v3.0 is recorded here, each with its decision in `doc
 | AM-6 | §22.12 | D-011 | preparing C3 |
 | AM-7 | §22.13 | D-012 | a spec-only adapter review |
 | AM-8 | §22.14 | D-014 | a spec-only review of the foundations |
+| AM-9 | §22.15 | D-015 | a spec-only review of the output surfaces |
 
 AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
@@ -2324,5 +2350,32 @@ A spec-only review covered the canonical JSON, the grammars, the YAML loader and
   - An unparseable record reports `field_count` 1 (§7.5.1).
   - The TS offset `-00:00` is accepted and means UTC (RFC 3339's "unknown local offset").
   - YAML diagnostics name the file's full path.
+
+---
+
+### 22.15 Amendment AM-9: output-surface review corrections (decision D-015)
+
+A spec-only review of the JSON outputs, the report, the templates, `compare`, the runner, `demo` and the CLI reproduced each item below. The templates, member orders, exit codes, escaping, CSP and determinism were exact.
+
+- **`--force` for `normalize` and `capture-quickbase` (§9.6).** Before, it could never replace the command's own previous output, and a refused run could delete files. Each command now has its own output names, the check comes before anything is deleted, and the new output is staged and swapped in only on success.
+- **Provenance of export runs (§9.3).** The run manifest listed the deleted temporary snapshot paths and omitted the export and the mapping. Now:
+  - those snapshot inputs keep their digests with `path: null`;
+  - the export's `capture-manifest.json`, its table files and the mapping file are inputs;
+  - all of them enter `provenance_id`.
+- **The demo's export scenarios** write their normalized snapshot to `<out>/<scenario>/snapshot`, as §11 already said.
+- **`--log-json`** covers library log records, and is accepted before or after the command (§11).
+- **The report.**
+  - It carries the literal "READY_FOR_REVIEW is not approval" (§9.4).
+  - Every root shows how many findings it blocks, even 0.
+  - `index.html` does not link a report that a run error prevented.
+- **`compare`.**
+  - A malformed assessment is `COMPARE_INPUT_INVALID`, not an internal error.
+  - `--out` refuses to replace a file without `--force`, and never replaces one of its own inputs (§11).
+- **Small items:**
+  - `assess --snapshot` with `--mapping` is a usage error.
+  - A failed write also removes the directories it created.
+  - The policy file is read once, so its recorded size and digest are of the parsed bytes.
+  - The digest notation of `inputs[].sha256` is stated (§9.3).
+  - The standard-output rule names `assess` (§11).
 
 *End of specification v3.0.*

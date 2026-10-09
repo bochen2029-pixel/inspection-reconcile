@@ -12,7 +12,7 @@ from inspection_reconcile.canonical import digest_of
 from inspection_reconcile.errors import RunError
 from inspection_reconcile.grammar import is_kind, parse_date_midnight_utc
 from inspection_reconcile.vocab import BINDINGS, CHECKS
-from inspection_reconcile.yamlsafe import load_yaml
+from inspection_reconcile.yamlsafe import loads_yaml
 
 POLICY_SCHEMA = "inspection-reconcile/policy/v1"
 
@@ -32,6 +32,7 @@ class Policy:
     max_file_bytes: int
     sha256: str
     raw_bytes_sha256: str
+    raw_bytes_size: int = 0
 
 
 def _basis_token(value: Any, where: str) -> str:
@@ -64,7 +65,7 @@ def _checks(value: Any, where: str) -> list[dict[str, Any]]:
     return expected
 
 
-def parse_policy(raw: Any, source: str, raw_bytes_sha256: str = "") -> Policy:
+def parse_policy(raw: Any, source: str, raw_bytes_sha256: str = "", raw_bytes_size: int = 0) -> Policy:
     body = v.obj(
         raw,
         source,
@@ -103,6 +104,7 @@ def parse_policy(raw: Any, source: str, raw_bytes_sha256: str = "") -> Policy:
         max_file_bytes=body["limits"]["max_file_bytes"],
         sha256=digest_of(raw),
         raw_bytes_sha256=raw_bytes_sha256,
+        raw_bytes_size=raw_bytes_size,
     )
 
 
@@ -113,8 +115,13 @@ def load_policy(path: Path) -> Policy:
         raw_bytes = path.read_bytes()
     except OSError as exc:
         raise RunError("POLICY_UNREADABLE", f"{path.as_posix()}: {exc.strerror or exc}") from exc
-    raw = load_yaml(path)
+    # One read: the digest and size recorded in the run manifest are those of the bytes that were parsed.
     try:
-        return parse_policy(raw, path.name, sha256_hex(raw_bytes))
+        text = raw_bytes.decode("utf-8-sig")  # strips a leading byte-order mark
+    except UnicodeDecodeError as exc:
+        raise RunError("CONFIG_INVALID", f"{path.as_posix()}: not valid UTF-8") from exc
+    raw = loads_yaml(text, path.as_posix())
+    try:
+        return parse_policy(raw, path.name, sha256_hex(raw_bytes), len(raw_bytes))
     except ValueError as exc:  # CanonicalError from digest_of: e.g. floats in the document
         raise RunError("CONFIG_INVALID", f"{path.name}: {exc}") from exc

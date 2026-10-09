@@ -135,3 +135,23 @@ probe found them exact, apart from two defects:
 
 The reviewer's patch added 18 tests, 12 of which fail without it. The review's notes on record numbering,
 `field_count`, `-00:00` and the probe's time-of-check gap are recorded in the spec and in `docs/limitations.md`.
+
+## D-015 · 2026-10-09 · Amendment AM-9: output-surface review corrections (SPEC §9.3, §9.4, §9.6, §11, §22.15)
+A spec-only review of the outputs, the report, `compare`, the runner, `demo` and the CLI confirmed that the
+templates, the member orders, the exit codes, the escaping, the CSP and determinism were all exact. It found the
+following defects:
+- **`--force`** could not replace the previous output of `normalize` or `capture-quickbase`. A refused run could
+  also delete files. Output is now checked and staged first.
+- **`assess --export` provenance** recorded deleted temporary paths and not the export. The decision is option A,
+  extended: the snapshot inputs keep their digests with `path: null`, and `export_manifest`, `export_table` and
+  `mapping` are added as inputs.
+- **The demo** did not keep an export scenario's normalized snapshot.
+- **`--log-json`** missed library log records.
+- **Report wording:** the "not approval" phrase was missing, and "blocks 0" was hidden.
+- **`index.html`** linked reports that a run error had prevented.
+- **`compare`:** a malformed assessment gave an internal error, and `--out` overwrote silently. It now takes
+  `--force` and never overwrites an input.
+- **Small items:** the policy is read once, and a failed write removes the directories it created.
+
+Helper task T5-surfaces made these fixes with 20 tests, failing first where they apply. The lead added the
+single policy read and its test.

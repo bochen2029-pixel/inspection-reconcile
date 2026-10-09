@@ -18,7 +18,7 @@ Step plan: SPEC §16.3. Each step ends green (`pytest`, `ruff check`, `ruff form
 | C2 capture | done | helper task T3: keyset reads, two-pass check, coverage declarations, files policy; AM-4. **Checkpoint C-mock** (D-005) |
 | C3 live verification | operator-gated | needs a Quickbase account, a test app and a user token; follow `docs/c3-runbook.md` |
 | D1 publication | operator-gated | the repository is private; publication is the owner's decision |
-| R review | in progress | the invariant and AC audit below is done; independent reviews applied: oracle (D-003), engine (D-009), adapters (D-012, D-013); the output-surfaces review is pending |
+| R review | in progress | the invariant and AC audit below is done; independent reviews applied: oracle (D-003), engine (D-009), adapters (D-012, D-013), foundations (D-014); the output-surfaces patches and a clean-clone documentation check are pending |
 
 ## Review pass R: invariants (SPEC §3)
 

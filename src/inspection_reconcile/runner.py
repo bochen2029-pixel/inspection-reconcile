@@ -76,8 +76,8 @@ def evaluate(
         for i in snapshot.inputs
     ]
     inputs.extend(extra_inputs)
-    # The digest of the bytes load_policy read: the policy file is not read a second time.
-    inputs.append(("policy", policy_path, policy_path.stat().st_size, policy.raw_bytes_sha256))
+    # The size and digest of the bytes load_policy read and parsed: the policy file is not touched a second time.
+    inputs.append(("policy", policy_path, policy.raw_bytes_size, policy.raw_bytes_sha256))
     inputs.sort(key=_input_order)
     provenance = identity.provenance_id(
         assessment.evaluation_id,

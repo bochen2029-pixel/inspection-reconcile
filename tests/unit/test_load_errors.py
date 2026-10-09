@@ -92,6 +92,25 @@ def test_the_evidence_root_must_not_be_a_junction(tmp_path):
     assert code_of(load_snapshot, root) == "EVIDENCE_ROOT_INVALID"
 
 
+def test_the_policy_is_read_once_and_its_recorded_digest_is_of_those_bytes(monkeypatch):
+    """The run manifest's policy input must describe the bytes that were parsed: one read, not two."""
+    import hashlib
+
+    reads = []
+    real_read_bytes = Path.read_bytes
+
+    def counting(self):
+        if self.name == POLICY.name:
+            reads.append(self)
+        return real_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", counting)
+    policy = load_policy(POLICY)
+    data = real_read_bytes(POLICY)
+    assert len(reads) == 1
+    assert (policy.raw_bytes_size, policy.raw_bytes_sha256) == (len(data), hashlib.sha256(data).hexdigest())
+
+
 def test_unreadable_policy_and_configuration(tmp_path):
     assert code_of(load_policy, tmp_path / "absent.yml") == "POLICY_UNREADABLE"
     assert code_of(load_yaml, tmp_path / "absent.yml") == "CONFIG_UNREADABLE"
