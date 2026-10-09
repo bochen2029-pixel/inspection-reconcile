@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Live verification (step C3)
+- **`tools/qb_build_test_app.py`** builds the Appendix D test app in your own Quickbase realm with one command:
+  - the app, the four tables, their fields and relationships, and the 200 S01 records with their 80 files;
+  - then `local/quickbase-live.yml` and `local/qb-capture.yml`.
+
+  It is the only code in the repository that writes to Quickbase. It only creates, only inside the app it creates,
+  and the package never imports it (SPEC AM-11, decision D-017). Without `--yes` it sends nothing.
+- **`docs/c3-runbook.md`** gains a fast path built on it.
+- **The guides** are rebuilt reproducibly. Word files are byte-identical from the same commit, and the PDFs are
+  identical in text, layout and appearance.
+
 ## 0.1.0 · 2026-10-09
 
 The first public release. Every requirement below is specified in [docs/SPEC.md](docs/SPEC.md). Decisions and

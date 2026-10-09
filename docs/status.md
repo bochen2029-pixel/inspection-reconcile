@@ -16,9 +16,9 @@ Step plan: SPEC §16.3. Each step ends green (`pytest`, `ruff check`, `ruff form
 | B3 export fixtures | done | S16 normalized equals S01 in `evaluation_id` and `assessment_semantic_sha256` (AC-14); S17 matches its oracle; P2 covers the export. **Checkpoint B** |
 | C1 client | done | helper task T2: four-operation allowlist, rate limit, 429/Retry-After, base64 download, redaction |
 | C2 capture | done | helper task T3: keyset reads, two-pass check, coverage declarations, files policy; AM-4. **Checkpoint C-mock** (D-005) |
-| C3 live verification | operator-gated | needs a Quickbase account and a user token, which only the owner can create; follow `docs/c3-runbook.md` |
+| C3 live verification | operator-gated | needs a Quickbase account and a user token, which only the owner can create. Prepared: helper task T7's `tools/qb_build_test_app.py` builds the Appendix D app with one command (AM-11), and its tests capture, normalize and assess what it builds in a fake realm. Then follow the fast path in `docs/c3-runbook.md` |
 | D1 publication | done | approved by the owner on 2026-10-09: the repository is public; GitHub Pages serves `demo --all`, rebuilt after every green ci run on `main`; [opnaorta.ai/inspection-reconcile](https://opnaorta.ai/inspection-reconcile) is the project page and TOOL 09 on its tools page |
-| R review | done | the invariant and AC audit below; independent reviews applied: oracle (D-003), engine (D-009), adapters (D-012, D-013), foundations (D-014), output surfaces (D-015), and the pre-publication go/no-go on a fresh clone (D-016) |
+| R review | done | the invariant and AC audit below; independent reviews applied: oracle (D-003), engine (D-009), adapters (D-012, D-013), foundations (D-014), output surfaces (D-015), the pre-publication go/no-go on a fresh clone (D-016), and the Appendix D builder (D-017) |
 
 ## Review pass R: invariants (SPEC §3)
 
@@ -30,7 +30,7 @@ Step plan: SPEC §16.3. Each step ends green (`pytest`, `ruff check`, `ruff form
 | I-4 explained and traceable | `tests/scenario/test_explained.py`: reason, explanation, resolution and locators on every finding of every scenario (§22.2 exemptions only) |
 | I-5 deterministic and pure | `tests/meta/test_engine_purity.py` (no clock, network, randomness, environment or file access in `engine/`, with a scanner self-test); P2 idempotence; identical `evaluation_ids.json` across runs |
 | I-6 approvals bind versions | R6 reads the approved digest from the approval record; FI-2 (every digest "matches") makes S04/S08 fail |
-| I-7 read-only, least privilege | the client allowlist refuses everything but four read operations before any I/O; token redaction in errors, reprs, logs and every written file (connector tests) |
+| I-7 read-only, least privilege | the client allowlist refuses everything but four read operations before any I/O; token redaction in errors, reprs, logs and every written file (connector tests). The one writer, `tools/qb_build_test_app.py`, is outside the package and only creates inside the app it creates (AM-11) |
 | I-8 closed configuration | the restricted YAML loader (no duplicate keys, aliases, tags or merge keys); closed policy, mapping, capture-config and export-manifest schemas |
 | I-9 no silent interpretation | S17 (unmapped value: UNKNOWN); unknown columns, members and types are run errors; AM-3 `EXPORT_INVALID` refusals |
 | I-10 synthetic public data | `test_no_private_terms_in_tracked_files`; `test_public_spec_has_no_private_preface` |

@@ -167,3 +167,18 @@ There are 6 tests, 4 of which fail on the old writer. The review's informational
 - **Kept as is:** `--log-json` relies on `basicConfig`, and hard links to `compare` inputs are not caught; both are
   minor.
 - **Fixed:** `make_screenshots.py` cleanup.
+
+## D-017 · 2026-10-09 · Amendment AM-11: a create-only builder for the Appendix D test app (SPEC §22.17, Appendix D)
+Building Appendix D by hand takes 29 fields, 200 records and 80 uploads, and every step is a chance to break the
+field ids. Helper task T7 wrote `tools/qb_build_test_app.py`, which does it with one command. It is bounded to six
+create and read operations, only inside the app it creates, and outside the package. An independent review
+attacked it, and a follow-up made "only creates" a check in its client: an `upsert` may not carry `mergeFieldId`
+or Record ID#.
+
+The request it was built to differed in three ways, each forced by the API:
+- **Decided By** is the token's own user, because the JSON API documents only `{"id"}` for user writes.
+- **Write failures are not retried,** because a failed write may have taken effect.
+- **Obligation ID's unique and required are left unset,** because `createField` cannot set them and the
+  allowlist has no update.
+
+The runbook's fast path keeps the token in the environment variable that `capture-quickbase` reads.

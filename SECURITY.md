@@ -14,9 +14,13 @@ Only the latest release on `main` receives fixes.
 These properties are deliberate, and a way around any of them is a vulnerability:
 
 - **Read-only Quickbase access.** The capture client's allowlist holds four read operations and is checked before
-  any I/O; no write or delete can be issued (SPEC §12.4, §17).
+  any I/O; no write or delete can be issued (SPEC §12.4, §17). The one writer in the repository,
+  `tools/qb_build_test_app.py`, sets up the test app for live verification and is never imported by the package. It
+  only creates, only inside the app it has just created, and refuses any other id before any I/O (SPEC §22.17).
 - **The token stays secret.** It is read only from the environment variable named in the capture configuration.
-  It never appears in files, URLs, logs, reports or exceptions, and a test scans every output for it.
+  It never appears in files, URLs, logs, reports or exceptions, and a test scans every output for it. The builder
+  reads it from an environment variable or a file, never from the command line, and its tests scan its outputs the
+  same way.
 - **Evidence files are read safely.** Paths pass a strict grammar, resolution is exact-case on every operating
   system, symbolic links, junctions and reparse points are never followed, nothing outside the evidence root is
   read, and size limits apply while streaming (SPEC §7.10).

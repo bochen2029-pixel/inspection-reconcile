@@ -7,6 +7,42 @@ Quickbase account can do it; the capture itself never writes to Quickbase.
 **Use a test app only.** Never point the tool at a production app or real data. The data imported here is the
 synthetic North Creek project. Keep everything captured under the gitignored `local/` directory.
 
+## Fast path: build the app with one command
+
+`tools/qb_build_test_app.py` replaces steps 1 to 6. You need a Quickbase account in which you may create apps,
+and a user token for your own user.
+
+1. Put the token in the environment, as in step 5:
+
+   ```powershell
+   $env:QB_USER_TOKEN = Read-Host -MaskInput "Quickbase user token"
+   ```
+
+2. Preview the plan. Nothing is sent:
+
+   ```bash
+   uv run python tools/qb_build_test_app.py --realm YOURREALM.quickbase.com
+   ```
+
+3. Build:
+
+   ```bash
+   uv run python tools/qb_build_test_app.py --realm YOURREALM.quickbase.com --yes
+   ```
+
+   This creates one new app with the four tables, the 200 S01 records and their 80 files. It prints the app ID and
+   whether every field ID equals the demo mapping's, and writes `local/quickbase-live.yml` and
+   `local/qb-capture.yml`.
+4. Continue with step 7.
+
+The tool only creates, and only inside the app it creates (SPEC §22.17). If a build stops part way, the message
+names the app: delete that app in Quickbase, then run the command again. The tool never deletes anything.
+
+Two things differ from a manual build:
+- **Approvals** are decided by your own user.
+- **The attestation** in `local/qb-capture.yml` is true for the token that built the app. For the least-privilege
+  setup of Appendix D, create the role and token of step 5, then update `operator_attestation`.
+
 ## 1. Generate the import files
 
 ```bash

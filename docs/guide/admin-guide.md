@@ -63,7 +63,7 @@ give byte-identical `assessment.json` and `report.html` on every operating syste
 | `policies/`, `mappings/` | the demonstration requirement packs and the Quickbase field mapping |
 | `fixtures/` | the oracle (`oracle.yaml`) and the 24 scenario snapshots and exports |
 | `sql/` | the SQL cross-check queries |
-| `tools/` | the fixture generator, the screenshot tool and the guide builder |
+| `tools/` | the fixture generator, the screenshot tool, the guide builder and the Appendix D test-app builder |
 | `tests/` | unit, scenario, property, fault-injection, CLI, HTML, SQL, adapter and connector tests |
 
 ### Design principles
@@ -601,10 +601,22 @@ Connections time out after 10 seconds, and reads after 60. Requests are sequenti
 
 The expected result is `READY_FOR_REVIEW`, with no finding added, removed or changed in outcome or reason.
 
+The runbook's fast path replaces the first two steps with one command, using a token for your own user.
+`tools/qb_build_test_app.py` creates the app, its tables, fields and relationships, and the S01 records with their
+80 files. It then writes `local/quickbase-live.yml` and `local/qb-capture.yml`. The least-privilege role of step 3
+stays a manual choice. Without `--yes`, the builder prints the plan and sends nothing:
+
+```bash
+# the plan only: nothing is sent until you add --yes
+uv run python tools/qb_build_test_app.py --realm example.quickbase.com
+```
+
 > [!NOTE]
-> A tool that builds the Appendix D test app through the Quickbase API is in development. It will be the only code in
-> the repository that writes to Quickbase, and it will live in `tools/`, separate from the read-only package. Until it
-> lands, the runbook's manual steps apply.
+> The builder is the only code in the repository that writes to Quickbase, and the package never imports it. Its
+> client allows six create and read operations, and refuses before any I/O every id that did not come from a
+> response in the same run. So it only creates, and only inside the app it has just created. A failed write is
+> never repeated. If a build stops part way, the message names the app for you to delete, because the tool never
+> deletes anything (SPEC §22.17).
 
 ## Security model
 

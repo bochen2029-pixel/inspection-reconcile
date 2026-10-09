@@ -191,7 +191,9 @@ A capture needs two files of your own, both kept in the gitignored `local/` dire
 - a capture configuration, copied from [docs/qb-capture.example.yml](docs/qb-capture.example.yml);
 - a field mapping with your app's table IDs, copied from `mappings/quickbase-demo.yml`.
 
-[docs/c3-runbook.md](docs/c3-runbook.md) covers both.
+[docs/c3-runbook.md](docs/c3-runbook.md) covers both. Its fast path writes them for you: `tools/qb_build_test_app.py`
+builds the Appendix D test app in your own realm with one command. That tool is the only code here that writes to
+Quickbase. It only creates, only inside the app it creates, and the package never imports it.
 
 ```bash
 # a Quickbase-shaped export, assessed through the field mapping (same identities as the canonical S01)
@@ -232,7 +234,7 @@ from Appendix D of the spec.
 | `fixtures/` | the oracle and the 24 scenario snapshots and exports |
 | `policies/`, `mappings/` | the demonstration requirement packs and the Quickbase field mapping |
 | `sql/` | the SQL cross-check queries |
-| `tools/` | the independent fixture generator, the screenshot script and the guide builder |
+| `tools/` | the independent fixture generator, the screenshot script, the guide builder and the Appendix D test-app builder |
 | `docs/guide/` | the User Guide and the Administrator Guide: Markdown sources, PDF and Word |
 | `docs/SPEC.md` | the normative specification; §22 is the amendment register |
 | `docs/decisions.md` | decisions and amendments |

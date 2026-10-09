@@ -1986,7 +1986,7 @@ The evidence-set digest is `sha256:e1c7a825b339db9678f73f6c0bfd9139daaca6fab91d7
 
 ## Appendix D · Quickbase test-app blueprint *(normative for step C3)*
 
-Build the app in an account and realm you are authorized to use. Create the fields **in the order listed**: new fields take the next free ID starting at 6, so this order reproduces the §12.3 FIDs. When you create a relationship, add **no** lookup or summary fields in that dialog. Step C2 verifies every FID against `GET /fields`; any difference goes into a live mapping kept in the gitignored `local/quickbase-live.yml` (it holds the real table IDs), never into the demo mapping.
+Build the app in an account and realm you are authorized to use, by hand as described here or with one command, `tools/qb_build_test_app.py` (§22.17). Create the fields **in the order listed**: new fields take the next free ID starting at 6, so this order reproduces the §12.3 FIDs. When you create a relationship, add **no** lookup or summary fields in that dialog. Step C2 verifies every FID against `GET /fields`; any difference goes into a live mapping kept in the gitignored `local/quickbase-live.yml` (it holds the real table IDs), never into the demo mapping.
 
 | table | fields in creation order (type) |
 |---|---|
@@ -2170,6 +2170,7 @@ Every change adopted after v3.0 is recorded here, each with its decision in `doc
 | AM-8 | §22.14 | D-014 | a spec-only review of the foundations |
 | AM-9 | §22.15 | D-015 | a spec-only review of the output surfaces |
 | AM-10 | §22.16 | D-016 | the pre-publication go/no-go review |
+| AM-11 | §22.17 | D-017 | preparing C3: a builder for Appendix D |
 
 AM-1 was adopted on 2026-10-09. The re-derivation found no oracle errors. AM-1 defines values and orders that the oracle relied on implicitly.
 
@@ -2396,5 +2397,31 @@ The pre-publication review reproduced a breach of AM-9's own promise that "a ref
 - **A `.previous-*` directory** that a failed rollback leaves behind is never deleted by a later `--force`, because it may be the only copy.
 
 Six tests cover it: fault injection at each rename, and the real Windows lock.
+
+---
+
+### 22.17 Amendment AM-11: a create-only builder for the Appendix D test app (decision D-017)
+
+Building Appendix D by hand takes 29 fields (three of them relationships), 200 records and 80 uploads, and every step is a chance to break the field ids. `tools/qb_build_test_app.py` builds it with one command. It is the only code in the repository that writes to Quickbase, and it is bounded as follows:
+
+- **It only creates.** Before any request, its client checks that the operation is one of six: `createApp`, `createTable`, `createField`, `createRelationship`, `upsert` and `getFields`. Only GET and POST are sent. An `upsert` may carry neither `mergeFieldId` nor Record ID#, so it can only add records. Nothing can update or delete.
+- **It writes only into the app it creates.** Every app, table, field and record id in a request must have come from a response in the same run. Any other id is refused before any request. Reference values are matched by key through `fieldsToReturn`, never assumed to be 1, 2, ….
+- **It stays outside the package.** It lives in `tools/`, and the package never imports it. I-7 governs the package and every source it reads, which it never writes to. The builder writes only synthetic data, and only into an app it has just created. The read-only client and its allowlist (§12.4) are unchanged.
+- **The token** comes from an environment variable or a file, never from the command line, and appears in no output.
+- **A failed write is never repeated**, because it may have taken effect. Only an HTTP 429 is waited out and repeated, and a 5xx only for `getFields`. A failure after `createApp` stops the build and names the app. The tool deletes nothing.
+- **Without `--yes`** it prints the plan and sends nothing.
+
+Before sending any record, it checks every table with `GET /fields` exactly as the capture does (§12.5 step 1). Then it writes two files, both validated with the package's own loaders:
+- `local/quickbase-live.yml`, with the ids Quickbase assigned;
+- `local/qb-capture.yml`.
+
+The API forces three differences from Appendix D:
+- **Obligation ID** is neither unique nor required. `createField` cannot set either property, and the allowlist has no update. Neither property affects capture or assessment: R0 finds duplicate keys itself (§7.5.2).
+- **Decided By** is the token's own user. The JSON API documents only `{"id"}` as the write form of a User field. The builder reads that id from the Record Owner (field 4) of its first created record, and `--decided-by-id` overrides it. No finding's outcome or reason depends on `decided_by`.
+- **The attestation** written to `local/qb-capture.yml` is true for the token that built the app and owns it. The least-privilege "Reconcile Reader" role and its token stay manual.
+
+The tool's tests build against a fake realm that enforces the OpenAPI request shapes and the documented write formats. They then capture, normalize and assess what was built. The result is S01's findings as the oracle states them, including when the realm assigns other field ids. This checks the builder and the reader against each other, not against Quickbase. C3 remains "not yet run against a live Quickbase app" until a live capture is compared (§18.1).
+
+One question only a live realm can answer: the builder creates Date/Time fields as `timestamp`, which the OpenAPI enum allows and §12.3 expects, while the API portal's example uses `datetime`. If a realm refuses `timestamp` or reports another type, the build stops at that field, before any record exists, and says why.
 
 *End of specification v3.0.*
