@@ -2404,11 +2404,18 @@ Six tests cover it: fault injection at each rename, and the real Windows lock.
 
 Building Appendix D by hand takes 29 fields (three of them relationships), 200 records and 80 uploads, and every step is a chance to break the field ids. `tools/qb_build_test_app.py` builds it with one command. It is the only code in the repository that writes to Quickbase, and it is bounded as follows:
 
-- **It only creates.** Before any request, its client checks that the operation is one of six: `createApp`, `createTable`, `createField`, `createRelationship`, `upsert` and `getFields`. Only GET and POST are sent. An `upsert` may carry neither `mergeFieldId` nor Record ID#, so it can only add records. Nothing can update or delete.
-- **It writes only into the app it creates.** Every app, table, field and record id in a request must have come from a response in the same run. Any other id is refused before any request. Reference values are matched by key through `fieldsToReturn`, never assumed to be 1, 2, ….
+- **It only creates, and its client enforces that before any request.**
+  - The operation must be one of six: `createApp`, `createTable`, `createField`, `createRelationship`, `upsert` and `getFields`. Only GET and POST are sent.
+  - An `upsert` carrying `mergeFieldId` or Record ID# is refused, and every table it creates must be keyed on Record ID#. So an `upsert` can only add records.
+  - Nothing can update or delete.
+- **It writes only into the app it creates.**
+  - Every app, table, field and record id in a request must have come from a response in the same run. The one exception is the optional `--decided-by-id` user id. Any other id is refused before any request.
+  - A field id Quickbase returns must be new: above 5, and not already used in that table.
+  - Reference values are matched by key through `fieldsToReturn`, never assumed to be 1, 2, ….
 - **It stays outside the package.** It lives in `tools/`, and the package never imports it. I-7 governs the package and every source it reads, which it never writes to. The builder writes only synthetic data, and only into an app it has just created. The read-only client and its allowlist (§12.4) are unchanged.
-- **The token** comes from an environment variable or a file, never from the command line, and appears in no output.
-- **A failed write is never repeated**, because it may have taken effect. Only an HTTP 429 is waited out and repeated, and a 5xx only for `getFields`. A failure after `createApp` stops the build and names the app. The tool deletes nothing.
+- **The token** comes from an environment variable or a file, never from the command line, and appears in no output. A value given where a variable name or a file path belongs is not echoed, because it may be the token itself.
+- **A failed write is never repeated**, because it may have taken effect. Only an HTTP 429 is waited out and repeated, and a 5xx only for `getFields`.
+- **It deletes nothing.** A failure after `createApp` stops the build and names the app. When `createApp`'s own outcome is unknown, the message says that an app may exist.
 - **Without `--yes`** it prints the plan and sends nothing.
 
 Before sending any record, it checks every table with `GET /fields` exactly as the capture does (§12.5 step 1). Then it writes two files, both validated with the package's own loaders:
@@ -2423,5 +2430,7 @@ The API forces three differences from Appendix D:
 The tool's tests build against a fake realm that enforces the OpenAPI request shapes and the documented write formats. They then capture, normalize and assess what was built. The result is S01's findings as the oracle states them, including when the realm assigns other field ids. This checks the builder and the reader against each other, not against Quickbase. C3 remains "not yet run against a live Quickbase app" until a live capture is compared (§18.1).
 
 One question only a live realm can answer: the builder creates Date/Time fields as `timestamp`, which the OpenAPI enum allows and §12.3 expects, while the API portal's example uses `datetime`. If a realm refuses `timestamp` or reports another type, the build stops at that field, before any record exists, and says why.
+
+The same review found one defect in the package. `capture-quickbase` echoed `token_env` in `QB_TOKEN_MISSING` and in its validation error, so a token pasted there in place of a variable's name was printed. A user token is lower case. A `token_env` value is now shown only when it is an upper-case name, and a validation error never shows it (I-7).
 
 *End of specification v3.0.*

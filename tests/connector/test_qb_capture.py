@@ -596,6 +596,24 @@ def test_make_client_reads_the_token_only_from_the_environment(app: MockApp) -> 
         client.close()
 
 
+def test_a_token_pasted_into_token_env_is_never_echoed() -> None:
+    """I-7. The likely mistake is the token itself where its variable's name belongs, and a user token is lower
+    case, so only an upper-case name is ever shown (review of T7, F1)."""
+    pasted = "b7syn_pasted_token_0_abcdef0123456789"  # a valid variable name: only make_client can catch it
+    with pytest.raises(RunError) as info:
+        make_client(config_with(token_env=pasted), user_agent="inspection-reconcile/0.1.0", environ={})
+    assert info.value.code == "QB_TOKEN_MISSING" and pasted not in str(info.value)
+    invalid = "b7syn-pasted-token-abcdef0123456789"  # not a variable name at all: the config check refuses it
+    with pytest.raises(RunError) as info:
+        config_with(token_env=invalid)
+    assert info.value.code == "CONFIG_INVALID" and invalid not in str(info.value)
+    with pytest.raises(RunError) as info:  # a conventional name is still shown: that is what makes it useful
+        make_client(
+            config_with(token_env="QB_TOKEN_TYPO"), user_agent="inspection-reconcile/0.1.0", environ={}
+        )
+    assert "the environment variable QB_TOKEN_TYPO is not set or empty" in str(info.value)
+
+
 def test_the_output_directory_must_be_absent_or_empty(
     tmp_path: Path, client: QuickbaseClient, mapping: Mapping
 ) -> None:

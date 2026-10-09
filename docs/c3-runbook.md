@@ -138,7 +138,9 @@ This prints `[] [] []`.
   realm did.
 - **Before you commit anything captured:**
   - replace the realm hostname and the app and table IDs;
-  - replace every user name and email in User fields;
+  - replace every user's name, email, user name and user ID **anywhere** in the capture. That means the User
+    fields, and also each file version's `creator` and the attestation's `attested_by`. With the fast path, the
+    token's user appears in all of them;
   - keep the unsanitized capture in `local/`.
 
   The spec asks that the sanitized responses, normalized again, reproduce the same snapshot.

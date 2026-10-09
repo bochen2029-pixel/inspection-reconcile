@@ -54,6 +54,9 @@ _HOSTNAME = re.compile(
 )
 _DBID = re.compile(r"[A-Za-z0-9]{1,64}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+# A token_env value a message may show. A user token is lower case, and pasting the token where its variable's name
+# belongs is the likely mistake, so any other value is never echoed (I-7).
+_SHOWN_ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,127}")
 
 
 # ----------------------------------------------------------------------------------------- configuration
@@ -88,6 +91,23 @@ def _pattern(regex: re.Pattern[str], label: str) -> v.Check:
     return check
 
 
+def _env_name(value: Any, where: str) -> str:
+    s = v.string(value, where)
+    if _ENV_NAME.fullmatch(s) is None:
+        raise v.fail(
+            where,
+            "is not a valid environment variable name (the value is not shown, in case it is the token)",
+        )
+    return s
+
+
+def _env_label(name: str) -> str:
+    """``name`` for a message, unless it could be the token itself."""
+    if _SHOWN_ENV_NAME.fullmatch(name):
+        return name
+    return "named by token_env (not shown: it is not an upper-case name, so it may be the token itself)"
+
+
 def _ts_string(value: Any, where: str) -> str:
     s = v.string(value, where)
     if grammar.parse_ts(s) is None:
@@ -104,7 +124,7 @@ def parse_capture_config(raw: Any, source: str) -> CaptureConfig:
             "schema": v.exact(CAPTURE_SCHEMA),
             "realm_hostname": _pattern(_HOSTNAME, "host name"),
             "app_id": _pattern(_DBID, "Quickbase app id"),
-            "token_env": _pattern(_ENV_NAME, "environment variable name"),
+            "token_env": _env_name,
             "page_size": v.integer(1, 10_000),
             "capture_files": v.boolean,
             "scope": lambda x, w: v.obj(
@@ -169,7 +189,9 @@ def make_client(
     env = os.environ if environ is None else environ
     token = env.get(config.token_env, "")
     if not token:
-        raise RunError("QB_TOKEN_MISSING", f"the environment variable {config.token_env} is not set or empty")
+        raise RunError(
+            "QB_TOKEN_MISSING", f"the environment variable {_env_label(config.token_env)} is not set or empty"
+        )
     return QuickbaseClient(
         config.realm_hostname,
         token,

@@ -171,9 +171,20 @@ There are 6 tests, 4 of which fail on the old writer. The review's informational
 ## D-017 · 2026-10-09 · Amendment AM-11: a create-only builder for the Appendix D test app (SPEC §22.17, Appendix D)
 Building Appendix D by hand takes 29 fields, 200 records and 80 uploads, and every step is a chance to break the
 field ids. Helper task T7 wrote `tools/qb_build_test_app.py`, which does it with one command. It is bounded to six
-create and read operations, only inside the app it creates, and outside the package. An independent review
-attacked it, and a follow-up made "only creates" a check in its client: an `upsert` may not carry `mergeFieldId`
-or Record ID#.
+create and read operations, only inside the app it creates, and outside the package.
+
+An independent review attacked it, with a provenance audit of every request, a cell-for-cell round trip of the
+built data against S01, and narrow mutants. Its verdict was "sound", and its findings were fixed in follow-up T7b:
+- **"Only creates" is now a check in the client.** An `upsert` may carry neither `mergeFieldId` nor Record ID#, and
+  every table must be keyed on Record ID#.
+- **An unknown createApp outcome** now says that an app may exist.
+- **A token passed** where a variable name or a file path belongs is no longer echoed.
+- **Returned field ids** must be new.
+- **The two local files** are written together.
+- **Twelve guards** that no test pinned now have tests.
+
+The same review found that `capture-quickbase` printed `token_env` verbatim in `QB_TOKEN_MISSING` and in its
+validation error. A token pasted there was therefore shown. It now shows only an upper-case name.
 
 The request it was built to differed in three ways, each forced by the API:
 - **Decided By** is the token's own user, because the JSON API documents only `{"id"}` for user writes.
