@@ -330,7 +330,7 @@ def is_link_or_reparse(path: Path) -> bool:
 def load_snapshot(root: Path) -> LoadedSnapshot:
     root = Path(root)
     if not root.is_dir():
-        raise RunError("SNAPSHOT_MISSING", f"{root}: not a directory")
+        raise RunError("SNAPSHOT_MISSING", f"{root.as_posix()}: not a directory")
     inputs: list[InputFile] = []
 
     def record(role: str, path: Path, data: bytes) -> None:

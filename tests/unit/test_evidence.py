@@ -1,9 +1,11 @@
 import hashlib
+import io
 import os
 import sys
 
 import pytest
 
+from inspection_reconcile.io import evidence as evidence_module
 from inspection_reconcile.io.evidence import Absent, FileSystemEvidence, NoPath, Present, TooLarge, Unreadable
 
 
@@ -78,3 +80,39 @@ def test_cache_probes_once(root):
     first = store.probe("O-008/photo.png")
     (root / "O-008" / "photo.png").write_bytes(b"changed")
     assert store.probe("O-008/photo.png") == first
+
+
+# §7.10 step 7: the read itself can fail or overrun the limit after the size check passed.
+
+
+def failing_open(error):
+    def fake_open(*args, **kwargs):
+        raise error
+
+    return fake_open
+
+
+def test_permission_denied_while_reading(root, monkeypatch):
+    monkeypatch.setattr(evidence_module, "open", failing_open(PermissionError(13, "denied")), raising=False)
+    assert FileSystemEvidence(root, 1000).probe("O-008/photo.png") == Unreadable("permission denied")
+
+
+def test_other_read_errors(root, monkeypatch):
+    monkeypatch.setattr(evidence_module, "open", failing_open(OSError(5, "I/O error")), raising=False)
+    assert FileSystemEvidence(root, 1000).probe("O-008/photo.png") == Unreadable("read error")
+
+
+def test_a_file_that_grows_past_the_limit_during_the_read(root, monkeypatch):
+    """stat said 14 bytes, but the read delivers 2,000: the limit applies to the bytes actually read."""
+    monkeypatch.setattr(evidence_module, "open", lambda *a, **k: io.BytesIO(b"x" * 2000), raising=False)
+    assert FileSystemEvidence(root, 1000).probe("O-008/photo.png") == TooLarge(2000)
+
+
+def test_the_case_hint_takes_the_smallest_matching_name(root):
+    """§7.10 step 8, on a case-sensitive file system: several case-insensitive matches give the smallest name."""
+    (root / "O-008" / "PHOTO.png").write_bytes(b"other")
+    names = {p.name for p in (root / "O-008").iterdir()}
+    if not {"PHOTO.png", "photo.png"} <= names:
+        pytest.skip("case-insensitive file system")
+    probe = FileSystemEvidence(root, 1000).probe("O-008/Photo.png")
+    assert probe == Absent("O-008/PHOTO.png")  # "P" (0x50) sorts before "p" (0x70)

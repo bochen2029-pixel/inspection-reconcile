@@ -112,7 +112,7 @@ def load_policy(path: Path) -> Policy:
     try:
         raw_bytes = path.read_bytes()
     except OSError as exc:
-        raise RunError("POLICY_UNREADABLE", f"{path}: {exc.strerror or exc}") from exc
+        raise RunError("POLICY_UNREADABLE", f"{path.as_posix()}: {exc.strerror or exc}") from exc
     raw = load_yaml(path)
     try:
         return parse_policy(raw, path.name, sha256_hex(raw_bytes))
