@@ -152,7 +152,7 @@ The full semantics, including the open-world rule that decides PASS, FAIL and UN
 uv run inspection-reconcile validate --snapshot DIR --policy FILE        # configuration check, list record defects
 uv run inspection-reconcile evidence-digest --snapshot DIR --policy FILE --inspection INS-001
                                                                            # the digest an approval should store
-uv run inspection-reconcile export-sqlite --snapshot DIR --policy FILE --out snapshot.sqlite
+uv run inspection-reconcile export-sqlite --snapshot DIR --policy FILE --out out/snapshot.sqlite
 uv run inspection-reconcile normalize --export DIR --mapping mappings/quickbase-demo.yml --out DIR
 uv run inspection-reconcile assess --export DIR --mapping mappings/quickbase-demo.yml --policy FILE --out DIR
 ```

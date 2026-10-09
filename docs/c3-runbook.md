@@ -7,6 +7,14 @@ Quickbase account can do it; the capture itself never writes to Quickbase.
 **Use a test app only.** Never point the tool at a production app or real data. The data imported here is the
 synthetic North Creek project. Keep everything captured under the gitignored `local/` directory.
 
+**Install the Quickbase extra first.** Both the builder and `capture-quickbase` need it:
+
+```bash
+uv sync --extra quickbase
+```
+
+`uv sync --all-extras`, from the README's quick start, includes it.
+
 ## Fast path: build the app with one command
 
 `tools/qb_build_test_app.py` replaces steps 1 to 6. You need a Quickbase account in which you may create apps,

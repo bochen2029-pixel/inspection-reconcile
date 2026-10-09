@@ -117,7 +117,7 @@ uv's own installation guide lists other options, for example `pipx install uv`.
 | command | installs | needed for |
 |---|---|---|
 | `uv sync` | PyYAML and Jinja2 | every command except `capture-quickbase` |
-| `uv sync --extra quickbase` | the above, plus httpx | `capture-quickbase` |
+| `uv sync --extra quickbase` | the above, plus httpx | `capture-quickbase`, and the test-app builder `tools/qb_build_test_app.py` |
 | `uv sync --all-extras` | the above, plus pytest, hypothesis, ruff and mypy | development and the test suite |
 
 ### Verify the installation
