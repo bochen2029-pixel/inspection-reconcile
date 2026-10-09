@@ -1,4 +1,4 @@
-"""Regression tests from the adapter review (uylmncsh): a re-delivered record, a grammar-valid unmapped label and a
+"""Regression tests from the adapter review: a re-delivered record, a grammar-valid unmapped label and a
 file version without a files[] entry. Expected verdicts come from SPEC §12.2-§12.5 and AM-3/AM-4, never from src/."""
 
 import json

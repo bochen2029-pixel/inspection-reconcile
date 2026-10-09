@@ -1,4 +1,4 @@
-"""G1 review (uylmncsh): a --force run that fails while swapping outputs leaves --out exactly as it was (SPEC §9.6).
+"""Output-surface review: a --force run that fails while swapping outputs leaves --out exactly as it was (SPEC §9.6).
 
 Before the fix, the previous output was deleted first and the staged output moved in afterwards, so a failure in
 between (on Windows, a file held open by another program) left --out with neither. Expectations come from §9.6's

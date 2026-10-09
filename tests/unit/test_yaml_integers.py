@@ -1,4 +1,4 @@
-"""Foundations review (uylmncsh): configuration integers are plain decimal (SPEC §6.2, the YAML 1.1 traps).
+"""Foundations review: configuration integers are plain decimal (SPEC §6.2, the YAML 1.1 traps).
 
 YAML 1.1 reads 0100 as octal 64, 1:30 as sexagesimal 90 and 0x64 as hexadecimal 100. Those forms must stay strings,
 so that the closed-world validators reject them where an integer is expected, instead of silently using another number.

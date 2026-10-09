@@ -1,4 +1,4 @@
-"""Foundations review (uylmncsh): a defective CSV record is never a run error (SPEC §5.4, §7.14).
+"""Foundations review: a defective CSV record is never a run error (SPEC §5.4, §7.14).
 
 Only bad UTF-8, a NUL byte and header violations make a CSV unreadable. A record that the csv module cannot parse
 is R0 MALFORMED_ROW (unattributable, so its dataset becomes partial), and an over-long cell fails its grammar.
