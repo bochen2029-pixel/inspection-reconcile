@@ -33,7 +33,7 @@ amendments AM-1 to AM-10 are in [docs/decisions.md](docs/decisions.md).
   Quickbase app; [docs/c3-runbook.md](docs/c3-runbook.md) describes that step.
 
 ### Verification
-- **Tests:** 816, with five fault injections and three properties (row-order invariance, idempotence and coverage
+- **Tests:** 817, with five fault injections and three properties (row-order invariance, idempotence and coverage
   monotonicity).
 - **CI:** Windows, macOS and Linux on Python 3.12 and 3.13, with a cross-platform identity comparison.
 - **Independent reviews:** separate passes re-derived the oracle and reviewed the engine, the adapters, the

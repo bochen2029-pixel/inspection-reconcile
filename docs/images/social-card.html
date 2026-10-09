@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=block" rel="stylesheet">
+<style>
+html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#06090f}
+body{font-family:'Space Grotesk',system-ui,sans-serif;color:#c7d2e0;position:relative;
+  background:radial-gradient(900px 520px at 18% 30%,rgba(251,146,60,.10),transparent 62%),#06090f}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(148,163,184,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.05) 1px,transparent 1px);background-size:40px 40px}
+.left{position:absolute;left:64px;top:62px;width:560px}
+.eyebrow{display:flex;align-items:center;gap:10px;font:600 13px 'JetBrains Mono',monospace;letter-spacing:.24em;color:#fb923c}
+.eyebrow span{width:26px;height:1px;background:#fb923c}
+.name{font:700 43px/1.05 'JetBrains Mono',monospace;color:#fed7aa;margin:30px 0 18px;letter-spacing:-.01em}
+.tag{font:600 38px/1.12 'Space Grotesk',sans-serif;color:#f1f5f9;letter-spacing:-.02em;margin:0 0 26px}
+.sub{font:400 19px/1.55 'Space Grotesk',sans-serif;color:#93a1b5;margin:0}
+.sub b{color:#e2e8f0;font-weight:600}
+.chips{position:absolute;left:64px;bottom:58px;display:flex;gap:10px;flex-wrap:wrap;width:600px}
+.chip{font:700 12px 'JetBrains Mono',monospace;letter-spacing:.12em;color:#9aa8bc;border:1px solid rgba(148,163,184,.28);border-radius:999px;padding:7px 13px}
+.chip.hot{color:#fed7aa;border-color:rgba(251,146,60,.45)}
+.shot{position:absolute;right:-36px;top:70px;width:560px;border:1px solid rgba(148,163,184,.22);border-radius:14px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(251,146,60,.12);transform:perspective(1400px) rotateY(-8deg) rotateX(2deg)}
+.shot img{display:block;width:100%}
+.fade{position:absolute;right:0;bottom:0;width:660px;height:250px;background:linear-gradient(180deg,transparent,#06090f 70%)}
+.mark{position:absolute;right:64px;bottom:58px;font:600 13px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#5f6b80}
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="shot"><img src="report-s02-dark.png" alt=""></div>
+<div class="fade"></div>
+<div class="left">
+  <div class="eyebrow"><span></span>INTELLECT·AI TOOLS · TOOL 09</div>
+  <div class="name">inspection-reconcile</div>
+  <p class="tag">Never “ready” on evidence it could not see.</p>
+  <p class="sub">The work an accepted scope requires, against the inspections, documents and approvals actually captured. <b>Every gap explained. Absence from a partial view is never a failure.</b></p>
+</div>
+<div class="chips">
+  <span class="chip hot">READ-ONLY QUICKBASE</span>
+  <span class="chip hot">DETERMINISTIC</span>
+  <span class="chip">WINDOWS · MACOS · LINUX</span>
+  <span class="chip">FREE · MIT</span>
+</div>
+<div class="mark">OPNAORTA.AI/INSPECTION-RECONCILE</div>
+</body>
+</html>
