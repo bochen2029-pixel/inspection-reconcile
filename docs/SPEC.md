@@ -56,8 +56,8 @@ v3.0 keeps v2.0's architecture and semantics. It fixes defects found by re-deriv
 | 2 | Finding keys are unique by construction: R0 keys carry `#<CODE>`; revision rows use `@<rev>`; items use `/`; R7 is keyed by inspection entity (§9.2) | two R0 defects on one artifact, or two current revisions of one out-of-scope inspection, produced duplicate keys, which `compare` cannot handle |
 | 3 | Unattributable rows are keyed by a content digest, not a row number | row-number keys break P1 order invariance |
 | 4 | An explicit, ordered R0 algorithm: grammar → duplicates (whole group quarantined) → multiple current → completion timestamp → time → dangling (§7.5) | v2.0 left duplicate rows in evaluation, and duplicate current rows raised two overlapping findings |
-| 5 | R0 findings are required only when they concern the assessed scope; out-of-scope defects are advisory (§7.5.6) | any defect anywhere in a full-table capture blocked an unrelated project |
-| 6 | `required` is fixed per check: R0–R6 are required (R0 per §7.5.6), R7 is advisory; the pack cannot change this | v2.0 let R4 be advisory, but its failure still made required R6 `NOT_EVALUATED`, which contradicts "advisory findings never change the status" |
+| 5 | R0 findings are required only when they concern the assessed scope; out-of-scope defects are advisory (§7.5.7) | any defect anywhere in a full-table capture blocked an unrelated project |
+| 6 | `required` is fixed per check: R0–R6 are required (R0 per §7.5.7), R7 is advisory; the pack cannot change this | v2.0 let R4 be advisory, but its failure still made required R6 `NOT_EVALUATED`, which contradicts "advisory findings never change the status" |
 | 7 | Revision-mode R6 compares only the required artifacts and ignores extra approved items; FAIL details and template are defined for both binding modes (§7.11) | exact set equality failed approvals that also covered a non-required sketch; the FAIL template assumed digests existed |
 | 8 | A new `evidence-digest` command computes the digest a review process should store (§11) | v2.0 required approvals to carry a digest that nothing could produce |
 | 9 | `MALFORMED_ROW` for a CSV row with the wrong field count (§7.5.1) | ragged rows were unspecified |
@@ -284,6 +284,8 @@ Every member is required except `scope` and `normalization`. Unknown members at 
 | TEXT | 1–200 Unicode code points, with no character of category Cc and no surrogate |
 | PATH | the path rules below |
 
+Every pattern is applied to the whole value (`re.fullmatch`); character classes are ASCII only, so `[0-9]` never matches other Unicode digits, and a trailing newline or space makes a value invalid. TS bounds: hour 00–23, minute 00–59, second 00–59, offset hours 00–23, offset minutes 00–59, and 1–6 fractional digits (AM-1).
+
 **PATH rules.** A violation is R0 `INVALID_PATH`, and the file is never opened.
 - **Segments.** `/`-separated and non-empty; no `.` or `..` segment; no segment ending in `.` or a space.
 - **Relative only.** No leading `/`.
@@ -329,7 +331,7 @@ The policy lists **accepted basis sets** (§6). A declared `complete_for_declare
 | 4 | `COVERAGE_BASIS_NOT_ACCEPTED` | declared complete, but no accepted basis set is satisfied | `unverified` |
 | 5 | `CHANGED_DURING_CAPTURE` | `consistency = changed_during_capture` | `unverified` |
 | 6 | `COVERAGE_CONTRADICTED` | a record elsewhere references a record absent from this dataset (R0 `DANGLING_REFERENCE`) | `partial` |
-| 7 | `UNATTRIBUTABLE_RECORDS` | this dataset contains a quarantined row that cannot be attributed (§7.5.6) | `partial` |
+| 7 | `UNATTRIBUTABLE_RECORDS` | this dataset contains a quarantined row that cannot be attributed (§7.5.7) | `partial` |
 
 A dataset is **complete** only if no reason applies. `partial` and `unverified` behave identically in evaluation; the difference is informational. The `approval_items` file shares the approvals dataset's coverage, so reasons arising from items apply to `approvals`.
 
@@ -378,13 +380,13 @@ checks:
 **Validation rules.** A violation is a run error (exit 2).
 - **Shape.**
   - Every member shown is required, and unknown members are rejected at every level.
-  - `checks` MUST equal exactly the eight entries shown, in that order. The `required` values are fixed by this specification and listed for readability; they cannot be changed. R0's per-finding requiredness follows §7.5.6.
+  - `checks` MUST equal exactly the eight entries shown, in that order. The `required` values are fixed by this specification and listed for readability; they cannot be changed. R0's per-finding requiredness follows §7.5.7.
 - **Values.**
   - `pack_id` is an ID and `version` is a quoted string.
   - `effective_from` is a quoted string `^\d{4}-\d{2}-\d{2}$` naming a valid date. It means midnight UTC of that date.
   - `synthetic` is a boolean; `project_id` is an ID; `scope_revision` is a REV.
   - `accepted_bases` is a non-empty list of non-empty lists of distinct basis tokens.
-  - Every requirement key and every document kind is a KIND, with no duplicates within a list.
+  - Every requirement key and every document kind is a KIND. Each `document_kinds` list is non-empty and has no duplicates (AM-1).
   - `required_binding` is `digest` or `revisions`; `max_file_bytes` is an integer from 1 to 2³¹ − 1.
 - **Consistency with the inputs.**
   - The policy's `project_id` equals `project.json`'s (`PROJECT_MISMATCH`).
@@ -680,6 +682,7 @@ Probe results are `Present(sha256, size)`, `Absent(case_hint?)`, `NoPath`, `Unre
 R7 considers the inspection entities that have at least one non-quarantined current row whose `obligation_id` is null or not in S:
 - Each such entity is one FAIL `UNMATCHED_INSPECTION` finding, `R7:inspection:<inspection_id>`, with `required: false`. `observed` is `{current_revisions, obligation_ids}`, sorted, with null rendered as `null`.
 - If there are none: `R7:snapshot:all`, PASS `NO_UNMATCHED_RECORDS`.
+- When R7 is not evaluated (§7.4), it emits the single finding `R7:snapshot:all`: NOT_EVALUATED `BLOCKED_BY_UPSTREAM`, `required: false` (AM-1). R0 always runs, so it is never NOT_EVALUATED.
 
 R7 speaks only about captured records; it never asserts that the source contains no unmatched records. An unmatched inspection often means the scope is stale.
 
@@ -1383,7 +1386,7 @@ fixtures/** -text
 
 ### 14.2 Scenarios
 
-Each scenario is the baseline plus the stated change. `fixture` and `policy` default to the scenario itself and `north-creek-demo`.
+Each scenario is the baseline plus the stated change. `fixture` and `policy` default to the scenario itself and `north-creek-demo`. An added or replaced row takes every column it does not name from its obligation's baseline pattern: project `NC-001`, asset `A-nnn`, inspection `INS-nnn`, `document_kind` from the artifact suffix (`-R` is `inspection_report`, `-P` is `photo`), `decided_by` `reviewer@example.invalid`, `inspection_revision` `1`, and `is_current` true unless stated (AM-1).
 
 | id | change from S01 | demonstrates |
 |---|---|---|
@@ -1391,7 +1394,7 @@ Each scenario is the baseline plus the stated change. `fixture` and `policy` def
 | S02-missing-inspection | remove INS-017, ART-017-R, ART-017-P, APR-017 and `evidence/O-017/` | a record that never existed is found from the scope |
 | S03-wrong-project-evidence | ART-023-P `project_id` := `NC-002` | mismatched evidence identity |
 | S04-revised-evidence | ART-031-R rev 1 `is_current` := false; add ART-031-R rev 2, current, `O-031/report-r2.pdf`, text "revision 2"; APR-031 unchanged | an approval covering an earlier evidence set |
-| S05-incomplete-capture | remove every record and file for O-037…O-040; the four datasets become `partial`, basis `[extraction_interrupted]` | absence from a partial view is not absence |
+| S05-incomplete-capture | remove the inspection, artifact and approval rows and the evidence files for O-037…O-040 (the scope rows remain); the four datasets become `partial`, basis `[extraction_interrupted]` | absence from a partial view is not absence |
 | S06-corrected | the same records as S01; `snapshot_id` NC-001-S06-corrected; capture 2026-10-02T17:55:00Z → 18:00:00Z | the corrected rerun for `compare S02 S06` |
 | S07-duplicate-current | add INS-012B rev 1: current, completed, O-012, A-012, `visual_inspection`, completed 2026-09-13T15:00:00Z | two current inspections for one obligation |
 | S08-silent-byte-change | rewrite `evidence/O-009/photo.png` with color (1, 2, 3); revision label unchanged | changed bytes under the same revision label |
@@ -1664,6 +1667,8 @@ Copy this block verbatim to `fixtures/oracle.yaml`. A test asserts that the two 
 - **Ranges.** In a `key`, `O-NNN..MMM` expands to every zero-padded obligation number from NNN to MMM. In `blocked_by` and `caused_by`, `{id}` is replaced by the expanded subject id.
 - **Unlisted findings** MUST be PASS.
 - **`required`** defaults to `false` for R7 entries and `true` for every other entry, unless the entry sets it.
+- **`reason`** defaults to `BLOCKED_BY_UPSTREAM` for NOT_EVALUATED entries; every other outcome states its reason (AM-1).
+- **`blocked_by` and `caused_by`** default to `[]`. Every listed field is compared exactly (AM-1).
 - **Expected total.** The number of findings is:
   - the number of listed R0 entries (1 if none: the `R0:snapshot:all` PASS);
   - plus 5;
@@ -2107,6 +2112,99 @@ ORDER BY 1, 2;
 - `r0_duplicate_keys` is empty.
 
 The test also runs over S23, where the duplicate query must return exactly `INS-004@1`.
+
+---
+
+## 22 · Amendment AM-1 (normative)
+
+Adopted on 2026-10-09 from an independent re-derivation of Appendix A (decision D-003). That re-derivation found no oracle errors; these amendments define values and orders the oracle relied on implicitly. Where this section and an earlier section differ, this section wins.
+
+### 22.1 `expected` and `observed`
+
+Every finding uses the values below; any field not listed is `{}`. NOT_EVALUATED findings have `{}` for both. Lists are sorted by the canonical JSON of their elements unless an order is stated. Canonical JSON sorts `null` first. R0 findings that merge several rows carry `count`, the number of merged rows.
+
+| finding | `expected` | `observed` |
+|---|---|---|
+| R0 `INVALID_VALUE`, `UNMAPPED_VALUE`, `INVALID_PATH` | `{}` | `{violations: [{field, value, rule}], count}` |
+| R0 `MALFORMED_ROW` | `{}` | `{dataset, field_count, header_count, count}` |
+| R0 `DUPLICATE_KEY` | `{}` | `{count, identical}` |
+| R0 `MULTIPLE_CURRENT_REVISIONS` | `{}` | `{current_revisions}` |
+| R0 `COMPLETED_WITHOUT_TIMESTAMP` | `{}` | `{count}` |
+| R0 `TIMESTAMP_AFTER_AS_OF` | `{}` | `{field, value, count}` (no `as_of`, so `compare` across capture times is unaffected) |
+| R0 `DANGLING_REFERENCE` | `{}` | `{missing: [{field, target, target_key}], count}` |
+| R1 project | `{project_id, scope_revision}` (from the policy) | `{scope_present, accepted, obligation_count, manifest_scope_revision, row_scope_revisions, row_project_ids}` |
+| R1 dataset | `{effective: "complete_for_declared_scope"}` | `{declared, basis, consistency, effective, reasons}` |
+| R2 | `{current_completed_inspections: 1}` | `{current_inspections: ["<id>@<rev>", …], superseded_revisions}` |
+| R3 | `{project_id, asset_id, activity_kind}` (the obligation's) | `{mismatches: [{subject, field, expected, observed}]}`. `subject` is `inspection:<id>@<rev>` or `artifact:<id>@<rev>`; sorted by (subject, field); `[]` when there is no counterexample |
+| R4 | `{document_kinds: sorted K}`, or `{document_kinds: null}` for `REQUIREMENT_UNDEFINED` | `{kinds: {kind: [sorted artifact ids]}, missing_kinds: [sorted]}` |
+| R5 | `{files: <size of E(O)>}` | `{files: [{artifact: "<id>@<rev>", status, sha256?}]}`, sorted by `artifact`; `sha256` only when present |
+| R6 | `{approved_evidence_digests, approved_artifact_revisions}`: the MISMATCH approvals' bindings for `EVIDENCE_CHANGED_SINCE_APPROVAL`, otherwise both `[]` | `{binding, current_evidence_digest, current_artifact_revisions, decision_approvals}`, plus `approved_revisions` for `REVISION_NOT_APPROVED` |
+| R7 FAIL | `{}` | `{current_revisions, obligation_ids}` |
+
+R1 project details:
+- `scope_present`: the scope member and its file both exist.
+- `accepted`: whether `scope.accepted` is non-null.
+- `obligation_count`: \|S\|.
+- `manifest_scope_revision`: a string or null.
+- `row_scope_revisions` and `row_project_ids`: the sorted distinct values among non-quarantined scope rows.
+
+R6 details:
+- **Revision lists.** `current_artifact_revisions` is a sorted list of `{artifact_id, revision}` objects. `approved_artifact_revisions` is a sorted list of such lists, one per revision-mode MISMATCH approval (its set J). `approved_evidence_digests` lists the distinct non-null digests of the digest-mode MISMATCH approvals.
+- **`binding`.**
+  - `digest` or `revisions`, when every approval in Acur classified MATCH or MISMATCH used that binding;
+  - `mixed`, when they used both;
+  - the pack's `required_binding`, when none was classified (steps 1–5, or only UNDETERMINED approvals).
+- **`decision_approvals`.**
+  - steps 11–13: the sorted ids of L;
+  - steps 8 and 10 (UNKNOWN from U): the deciding approval;
+  - `EVIDENCE_CHANGED_SINCE_APPROVAL`: the sorted ids of the MISMATCH approvals in Acur;
+  - otherwise `[]`.
+
+### 22.2 `evidence`
+
+Locators per finding: `{system, dataset, locator}`, where `system` is the manifest's `source.system` and `dataset` is `scope`, `inspections`, `artifacts`, `approvals` or `approval_items`. Locators are deduplicated, then sorted by (dataset, locator).
+
+| finding | rows cited |
+|---|---|
+| R0 | the subject's rows |
+| R1 project | every scope row (none when the scope is missing) |
+| R1 dataset | none |
+| R2 | O's scope row(s), the rows of Cur(O), and the non-current, non-quarantined inspection rows linked to O |
+| R3 | O's scope row(s), I's row, and the rows of I's current artifacts |
+| R4, R5 | I's row and the rows of E(O) |
+| R6 | I's row, the rows of A, and their approval-item rows |
+| R7 | the entity's current rows |
+| NOT_EVALUATED | none |
+
+### 22.3 Orders and reasons
+
+- **`blocked_by` and `caused_by`** are sorted in code-point order of the key strings.
+- **R6 step 10:** when several later UNDETERMINED approvals qualify, the reason is that of the first in (`decided_at`, `approval_id`) order, as in step 8.
+- **Exclusive classification.** A cell listed as unmapped in the normalization file reports `UNMAPPED_VALUE` only, never also `INVALID_VALUE`.
+- **PATH rules.** A value reports exactly one rule: the first violated in this order. It is absolute; it is too long; characters scanned left to right report a control or forbidden character. Then, segment by segment from the left: empty, dot segment (`.` and `..` report only this), trailing dot or space, segment too long, reserved name. The reserved-name test uses the part of the segment before its first `.`, with trailing spaces removed, case-insensitively.
+
+### 22.4 Templates
+
+- **Several qualifying subjects.** A template that names one artifact or approval names the first qualifying subject in sorted order, followed by ` (and N more)` when N > 0.
+- **No path.** A missing path renders as `no path recorded`.
+- **Placeholders.**
+  - `{entity}` is "Inspection" or "Artifact".
+  - `{key}` is the human key form: "INS-004 revision 1", "APR-001", "O-005" or "APR-001 / ART-001-R".
+  - `{dataset}` is the dataset name.
+
+### 22.5 Rows in identities
+
+- **Quarantined `raw`** holds schema columns only, never `x_` columns. A quarantined artifact row keeps `relative_path` in `raw`, because the path is part of the defect; this is the one exception to the path exclusion of §8.4.
+- **An `unattributable_row` subject** digests `{"dataset", "cells"}`, where `cells` is the object of schema columns (raw string or null, no `x_` columns). For `MALFORMED_ROW`, `cells` is the list of raw cells.
+
+### 22.6 Probe without an evidence root
+
+When `evidence_files` is omitted, every probe returns Absent without touching the file system. The `DATASET_MISSING` coverage then makes R5 UNKNOWN `NOT_CAPTURED`.
+
+### 22.7 Intended consequences *(informative)*
+
+- **A dangling reference** is attributed to the empty set, because its target does not exist, so the finding is advisory. Its uncertainty is carried by `COVERAGE_CONTRADICTED` on the target dataset (S20). It is not unattributable.
+- **A row whose key cannot be read** is unattributable. It downgrades its whole dataset to partial, so every dependent check becomes UNKNOWN. This blast radius is deliberate under I-2.
 
 ---
 
