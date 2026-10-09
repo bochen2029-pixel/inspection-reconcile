@@ -28,7 +28,12 @@ def test_every_template_alias_points_at_a_template():
 
 def test_generator_quickbase_import(tmp_path):
     proc = subprocess.run(
-        [sys.executable, str(REPO / "tools" / "make_fixtures.py"), "--quickbase-import", str(tmp_path / "qb")],
+        [
+            sys.executable,
+            str(REPO / "tools" / "make_fixtures.py"),
+            "--quickbase-import",
+            str(tmp_path / "qb"),
+        ],
         capture_output=True,
         text=True,
         timeout=300,
