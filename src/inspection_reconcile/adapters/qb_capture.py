@@ -22,7 +22,12 @@ from typing import Any
 from inspection_reconcile import grammar
 from inspection_reconcile import validate as v
 from inspection_reconcile.adapters.mapping import Mapping, TableMap, verify_fields
-from inspection_reconcile.adapters.qb_client import LOGGER_NAME, QuickbaseClient, QuickbaseHTTPError
+from inspection_reconcile.adapters.qb_client import (
+    LOGGER_NAME,
+    FileTooLarge,
+    QuickbaseClient,
+    QuickbaseHTTPError,
+)
 from inspection_reconcile.adapters.qb_export import (
     CAPTURE_MANIFEST,
     EXPORT_FORMAT,
@@ -608,16 +613,18 @@ def _download_into(
     emit: Callable[[str, bytes], None],
 ) -> None:
     try:
-        content, _ = client.download_file(table_id, rid, fid, version)
+        content, _ = client.download_file(table_id, rid, fid, version, max_bytes=config.max_file_bytes)
+    except FileTooLarge as exc:
+        # The size is recorded only when the whole body was read; a download stopped at the limit leaves it null.
+        log.warning("file %s/%d/%d/v%d is over max_file_bytes; not captured", table_id, rid, fid, version)
+        entry["status"] = "too_large"
+        entry["bytes"] = exc.size
+        return
     except RunError as exc:
         if exc.code not in DOWNLOAD_FAILURES:
             raise
         log.warning("file %s/%d/%d/v%d was not captured: %s", table_id, rid, fid, version, exc.code)
         entry["status"] = "error"
-        return
-    if len(content) > config.max_file_bytes:
-        entry["status"] = "too_large"
-        entry["bytes"] = len(content)
         return
     path = file_relative_path(table_id, rid, fid, version, name)
     emit(path, content)

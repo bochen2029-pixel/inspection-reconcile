@@ -54,6 +54,9 @@ _ALLOWLIST: tuple[tuple[str, re.Pattern[str], frozenset[str], str], ...] = (
     ),
 )
 
+ERROR_BODY_LIMIT = 64 * 1024
+_BASE64_WHITESPACE = b" \t\n\r\x0b\x0c"  # what bytes.split() treats as whitespace
+
 _AUTH_VALUE_RE = re.compile(r"(?i)(authorization['\"]?\s*[:=]\s*['\"]?)[^\r\n'\",}]*")
 _SCHEME_TOKEN_RE = re.compile(r"(?i)\b(QB-(?:USER|TEMP)-TOKEN)\s+[^\s'\",}]+")
 
@@ -69,6 +72,38 @@ class QuickbaseHTTPError(RunError):
     def __init__(self, status: int, message: str) -> None:
         super().__init__("QB_HTTP_ERROR", message)
         self.status = status
+
+
+class FileTooLarge(RunError):
+    """``QB_FILE_TOO_LARGE``: a file over ``max_bytes`` (SPEC §12.5 step 3). ``size`` is the decoded size when the
+    whole body was read, and ``None`` when the download stopped at the limit, because the full size is unknown."""
+
+    def __init__(self, message: str, size: int | None) -> None:
+        super().__init__("QB_FILE_TOO_LARGE", message)
+        self.size = size
+
+
+def base64_cap(max_bytes: int) -> int:
+    """The longest base64 payload (whitespace excluded) of a file of at most ``max_bytes`` bytes."""
+    return 4 * ((max_bytes + 2) // 3)
+
+
+def _read_all(response: httpx.Response) -> bytes:
+    return response.read()
+
+
+def _read_prefix(response: httpx.Response, limit: int) -> bytes:
+    """At most ``limit`` bytes of a streamed body. An error body never needs more, and a failure while reading it
+    must not turn a non-retryable status into a retried transport error."""
+    data = bytearray()
+    try:
+        for chunk in response.iter_bytes():
+            data += chunk[: limit - len(data)]
+            if len(data) >= limit:
+                break
+    except httpx.TransportError:
+        pass
+    return bytes(data)
 
 
 def redact(text: str, token: str | None = None) -> str:
@@ -290,19 +325,47 @@ class QuickbaseClient:
         return data
 
     def download_file(
-        self, table_id: str, record_id: int, field_id: int, version: int
+        self, table_id: str, record_id: int, field_id: int, version: int, *, max_bytes: int | None = None
     ) -> tuple[bytes, str | None]:
-        """``GET /v1/files/{t}/{r}/{f}/{v}`` with ``v >= 1``: the base64-decoded bytes and the file name, if any."""
+        """``GET /v1/files/{t}/{r}/{f}/{v}`` with ``v >= 1``: the base64-decoded bytes and the file name, if any.
+
+        The body is streamed. With ``max_bytes``, it is never held beyond the base64 size of ``max_bytes``: once more
+        than ``base64_cap(max_bytes)`` payload characters (whitespace excluded) have arrived, the download stops and
+        :class:`FileTooLarge` is raised with an unknown size. A complete body that decodes to more than
+        ``max_bytes`` raises it with the size, so the two checks agree at the boundary."""
         for name, value in (("record_id", record_id), ("field_id", field_id), ("version", version)):
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise AllowlistError(f"downloadFile: {name} must be an integer >= 1")
-        response = self._request("GET", f"/files/{table_id}/{record_id}/{field_id}/{version}")
-        compact = b"".join(response.content.split())
+        if max_bytes is not None and (
+            isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1
+        ):
+            raise ValueError("max_bytes must be a positive integer or None")
+        cap = None if max_bytes is None else base64_cap(max_bytes)
+        what = f"downloadFile {table_id}/{record_id}/{field_id}/v{version}"
+
+        def read_base64(response: httpx.Response) -> tuple[bytes, str | None]:
+            parts: list[bytes] = []
+            count = 0
+            for chunk in response.iter_bytes():
+                payload = chunk.translate(None, _BASE64_WHITESPACE)
+                count += len(payload)
+                if cap is not None and count > cap:
+                    raise FileTooLarge(f"{what}: more than {max_bytes} bytes; the download was stopped", None)
+                parts.append(payload)
+            filename = parse_content_disposition_filename(response.headers.get("content-disposition"))
+            return b"".join(parts), filename
+
+        compact, filename = self._request(
+            "GET", f"/files/{table_id}/{record_id}/{field_id}/{version}", read_body=read_base64
+        )
         try:
             content = base64.b64decode(compact, validate=True)
         except (binascii.Error, ValueError):
             raise RunError("QB_PROTOCOL", "downloadFile returned a body that is not valid base64") from None
-        filename = parse_content_disposition_filename(response.headers.get("content-disposition"))
+        if max_bytes is not None and len(content) > max_bytes:
+            raise FileTooLarge(
+                f"{what}: {len(content)} bytes is more than the limit of {max_bytes}", len(content)
+            )
         return content, filename
 
     def close(self) -> None:
@@ -322,7 +385,13 @@ class QuickbaseClient:
         *,
         params: Mapping[str, str] | None = None,
         json_body: dict[str, Any] | None = None,
-    ) -> httpx.Response:
+        read_body: Callable[[httpx.Response], Any] = _read_all,
+    ) -> Any:
+        """One allowed operation with the limiter and the retry policy; returns ``read_body(response)``.
+
+        The response is streamed: the status line decides a retry before any body is read, a 2xx body is consumed by
+        ``read_body`` (the whole body by default), and a transport error while the body arrives is retried like any
+        other. The stream is closed before any retry wait."""
         operation = check_allowlist(method, path, params)
         if self._closed:
             raise RunError("QB_CLIENT_CLOSED", f"{operation} was called after close()")
@@ -331,26 +400,30 @@ class QuickbaseClient:
         while True:
             attempt += 1
             self._throttle()
+            retry: tuple[str, float] | None = None
             try:
-                response = self._http.request(method, url, params=dict(params or {}), json=json_body)
+                with self._http.stream(method, url, params=dict(params or {}), json=json_body) as response:
+                    status = response.status_code
+                    if 200 <= status < 300:
+                        log.debug("%s %s -> %d (attempt %d)", method, path, status, attempt)
+                        return read_body(response)
+                    if status == 429:
+                        retry = ("HTTP 429", self._retry_after(response, attempt))
+                    elif 500 <= status < 600:
+                        retry = (f"HTTP {status}", self._backoff(attempt))
+                    else:
+                        detail = self._error_detail(_read_prefix(response, ERROR_BODY_LIMIT))
+                        if status in (401, 403):
+                            raise RunError(
+                                "QB_PERMISSION", f"{operation} was refused with HTTP {status}: {detail}"
+                            )
+                        raise QuickbaseHTTPError(status, f"{operation} failed with HTTP {status}: {detail}")
             except httpx.TransportError as exc:
                 last = f"{type(exc).__name__}: {self._redact(str(exc))}"
                 self._retry_or_raise(operation, attempt, last, self._backoff(attempt))
                 continue
-            status = response.status_code
-            if 200 <= status < 300:
-                log.debug("%s %s -> %d (attempt %d)", method, path, status, attempt)
-                return response
-            if status == 429:
-                self._retry_or_raise(operation, attempt, "HTTP 429", self._retry_after(response, attempt))
-                continue
-            if 500 <= status < 600:
-                self._retry_or_raise(operation, attempt, f"HTTP {status}", self._backoff(attempt))
-                continue
-            detail = self._error_detail(response)
-            if status in (401, 403):
-                raise RunError("QB_PERMISSION", f"{operation} was refused with HTTP {status}: {detail}")
-            raise QuickbaseHTTPError(status, f"{operation} failed with HTTP {status}: {detail}")
+            assert retry is not None  # every other path above returned or raised
+            self._retry_or_raise(operation, attempt, *retry)
 
     def _retry_or_raise(self, operation: str, attempt: int, last: str, delay: float) -> None:
         if attempt >= self._max_attempts:
@@ -404,25 +477,25 @@ class QuickbaseClient:
 
     # -- response decoding -----------------------------------------------------------------------------------
 
-    def _json(self, response: httpx.Response, operation: str) -> Any:
+    def _json(self, content: bytes, operation: str) -> Any:
         try:
-            return json.loads(response.content.decode("utf-8"))
+            return json.loads(content.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise RunError(
                 "QB_PROTOCOL", f"{operation} returned a body that is not valid UTF-8 JSON"
             ) from None
 
-    def _error_detail(self, response: httpx.Response) -> str:
+    def _error_detail(self, content: bytes) -> str:
         text = ""
         try:
-            body = json.loads(response.content.decode("utf-8"))
+            body = json.loads(content.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             body = None
         if isinstance(body, dict):
             parts = [str(body[k]) for k in ("message", "description") if body.get(k) not in (None, "")]
             text = " - ".join(parts)
         if not text:
-            text = response.content[:200].decode("utf-8", errors="replace").strip() or "(no body)"
+            text = content[:200].decode("utf-8", errors="replace").strip() or "(no body)"
         return self._redact(text)
 
     def _redact(self, text: str) -> str:
