@@ -117,4 +117,5 @@ def test_a_failed_write_leaves_neither_partial_outputs_nor_temporary_files(tmp_p
     with pytest.raises(RunError) as err:
         write_files(out, {"a.json": b"{}\n", "b.json": b"{}\n", "c.json": b"{}\n"})
     assert err.value.code == "WRITE_FAILED"
-    assert sorted(p.name for p in out.iterdir()) == []  # a.json was undone; no .tmp file is left
+    # a.json was undone, no .tmp file is left, and the directory this run created is removed too
+    assert not out.exists()

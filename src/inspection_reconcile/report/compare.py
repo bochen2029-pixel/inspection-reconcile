@@ -12,8 +12,13 @@ COMPARISON_SCHEMA = "inspection-reconcile/comparison/v1"
 COMPARED = ("outcome", "reason", "expected", "observed", "blocked_by", "caused_by", "required")
 
 
+def assessment_file(path: Path) -> Path:
+    """A compare PATH is an assessment.json or a directory that contains one (SPEC §11)."""
+    return path / "assessment.json" if path.is_dir() else path
+
+
 def load_assessment(path: Path) -> dict[str, Any]:
-    target = path / "assessment.json" if path.is_dir() else path
+    target = assessment_file(path)
     try:
         doc = json.loads(target.read_bytes().decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:

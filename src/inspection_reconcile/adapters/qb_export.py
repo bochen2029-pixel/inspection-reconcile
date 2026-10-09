@@ -411,6 +411,21 @@ def _read_pages(table_dir: Path, label: str) -> list[Any]:
     return pages
 
 
+def export_input_files(export_dir: Path, mapping: Mapping) -> list[tuple[str, Path]]:
+    """The export files ``normalize`` reads, by run-manifest role (SPEC §9.3): the capture manifest, then each
+    mapped table's ``fields.json`` and page files. Captured files are not listed: their bytes reach the snapshot's
+    evidence and so the evaluation itself."""
+    files = [("export_manifest", export_dir / CAPTURE_MANIFEST)]
+    for role in sorted(mapping.tables):
+        table_dir = export_dir / "tables" / role
+        files.append(("export_table", table_dir / "fields.json"))
+        pages = sorted(
+            (p for p in table_dir.iterdir() if _PAGE_FILE.fullmatch(p.name)), key=lambda p: int(p.name[5:-5])
+        )
+        files.extend(("export_table", page) for page in pages)
+    return files
+
+
 def convert_export(
     export_dir: Path, mapping: Mapping
 ) -> tuple[dict[str, Any], dict[str, list[tuple[dict[str, str | None], int]]], _Notes]:

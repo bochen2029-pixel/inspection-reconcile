@@ -32,6 +32,7 @@ from inspection_reconcile.vocab import (
 )
 
 LOG_JSON = False
+LOG_JSON_HELP = "write diagnostics to stderr as JSON lines"
 
 
 def _configure_console() -> None:
@@ -100,21 +101,21 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_assess(args: argparse.Namespace) -> int:
-    from inspection_reconcile.runner import evaluate, normalized_export
+    from inspection_reconcile.runner import evaluate, evaluate_export
 
+    if args.snapshot and args.mapping:
+        raise RunError("USAGE", "--mapping applies only to --export")
+    if args.export and not args.mapping:
+        raise RunError("USAGE", "--export needs --mapping")
     out = Path(args.out)
     if not args.force:
         prepare_out(out, force=False)
     as_of = _as_of(args.as_of)
     if args.snapshot:
         evaluation = evaluate(Path(args.snapshot), Path(args.policy), as_of)
-        files = evaluation.outputs()
     else:
-        if not args.mapping:
-            raise RunError("USAGE", "--export needs --mapping")
-        with normalized_export(Path(args.export), Path(args.mapping)) as (snapshot_dir, info):
-            evaluation = evaluate(snapshot_dir, Path(args.policy), as_of, mapping=info)
-            files = evaluation.outputs()
+        evaluation, _ = evaluate_export(Path(args.export), Path(args.mapping), Path(args.policy), as_of)
+    files = evaluation.outputs()
     prepare_out(out, args.force)
     write_files(out, files)
     a = evaluation.assessment
@@ -137,12 +138,22 @@ def cmd_normalize(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    from inspection_reconcile.report.compare import compare, has_differences, load_assessment
+    from inspection_reconcile.report.compare import assessment_file, compare, has_differences, load_assessment
 
-    comparison = compare(load_assessment(Path(args.before)), load_assessment(Path(args.after)))
-    if args.out:
-        target = Path(args.out)
-        write_files(target.parent if str(target.parent) else Path("."), {target.name: json_bytes(comparison)})
+    before, after = Path(args.before), Path(args.after)
+    target = Path(args.out) if args.out else None
+    if target is not None:
+        if target.resolve() in {assessment_file(before).resolve(), assessment_file(after).resolve()}:
+            raise RunError(
+                "COMPARE_OUT_IS_INPUT", f"{target.as_posix()}: --out names an input of this comparison"
+            )
+        if target.is_dir():
+            raise RunError("OUT_INVALID", f"{target.as_posix()}: is a directory; --out names a file")
+        if target.exists() and not args.force:
+            raise RunError("OUT_EXISTS", f"{target.as_posix()}: exists (use --force)")
+    comparison = compare(load_assessment(before), load_assessment(after))
+    if target is not None:
+        write_files(target.parent, {target.name: json_bytes(comparison)})
     print(
         f"{comparison['before']['status']} -> {comparison['after']['status']}  "
         f"changed={len(comparison['changed'])} added={len(comparison['added'])} "
@@ -214,15 +225,19 @@ def build_parser() -> argparse.ArgumentParser:
         description="Check inspection documentation readiness against an explicit requirement pack.",
     )
     parser.add_argument("--version", action="version", version=f"inspection-reconcile {__version__}")
-    parser.add_argument("--log-json", action="store_true", help="write diagnostics to stderr as JSON lines")
+    parser.add_argument("--log-json", action="store_true", help=LOG_JSON_HELP)
+    # Every command also accepts --log-json after its name. Its default is SUPPRESS so that a command given
+    # without the flag does not reset one given before it (argparse copies a subparser's defaults over).
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--log-json", action="store_true", default=argparse.SUPPRESS, help=LOG_JSON_HELP)
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    p = sub.add_parser("validate", help="check configuration and list record-level defects")
+    p = sub.add_parser("validate", parents=[common], help="check configuration and list record-level defects")
     p.add_argument("--snapshot", required=True)
     p.add_argument("--policy", required=True)
     p.set_defaults(func=cmd_validate)
 
-    p = sub.add_parser("assess", help="assess a snapshot (or a Quickbase-shaped export)")
+    p = sub.add_parser("assess", parents=[common], help="assess a snapshot (or a Quickbase-shaped export)")
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--snapshot")
     src.add_argument("--export")
@@ -233,20 +248,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_assess)
 
-    p = sub.add_parser("normalize", help="turn a Quickbase-shaped export into a canonical snapshot")
+    p = sub.add_parser(
+        "normalize", parents=[common], help="turn a Quickbase-shaped export into a canonical snapshot"
+    )
     p.add_argument("--export", required=True)
     p.add_argument("--mapping", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_normalize)
 
-    p = sub.add_parser("compare", help="compare two assessments by finding key")
+    p = sub.add_parser("compare", parents=[common], help="compare two assessments by finding key")
     p.add_argument("--before", required=True)
     p.add_argument("--after", required=True)
     p.add_argument("--out")
+    p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_compare)
 
-    p = sub.add_parser("demo", help="run the fixture scenarios against the oracle")
+    p = sub.add_parser("demo", parents=[common], help="run the fixture scenarios against the oracle")
     which = p.add_mutually_exclusive_group(required=True)
     which.add_argument("--scenario")
     which.add_argument("--all", action="store_true")
@@ -255,21 +273,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_demo)
 
-    p = sub.add_parser("evidence-digest", help="print the evidence-set digest a review should store")
+    p = sub.add_parser(
+        "evidence-digest", parents=[common], help="print the evidence-set digest a review should store"
+    )
     p.add_argument("--snapshot", required=True)
     p.add_argument("--policy", required=True)
     p.add_argument("--inspection", required=True)
     p.add_argument("--revision")
     p.set_defaults(func=cmd_evidence_digest)
 
-    p = sub.add_parser("export-sqlite", help="export the snapshot's valid rows to SQLite (Appendix G)")
+    p = sub.add_parser(
+        "export-sqlite", parents=[common], help="export the snapshot's valid rows to SQLite (Appendix G)"
+    )
     p.add_argument("--snapshot", required=True)
     p.add_argument("--policy", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_export_sqlite)
 
-    p = sub.add_parser("capture-quickbase", help="read-only capture from a Quickbase app (operator-gated)")
+    p = sub.add_parser(
+        "capture-quickbase", parents=[common], help="read-only capture from a Quickbase app (operator-gated)"
+    )
     p.add_argument("--config", required=True)
     p.add_argument("--mapping", required=True)
     p.add_argument("--out", required=True)

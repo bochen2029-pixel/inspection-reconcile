@@ -129,14 +129,26 @@ def _owned(entry: Path, files: set[str], dirs: set[str]) -> bool:
 
 
 def write_files(out: Path, files: Mapping[str, bytes]) -> list[Path]:
-    """Write each file through ``<name>.tmp.<pid>`` + fsync + os.replace; undo this run's writes on failure."""
+    """Write each file through ``<name>.tmp.<pid>`` + fsync + os.replace. On failure, undo this run's writes: its
+    files, then the directories it created that are empty again, deepest first."""
     written: list[Path] = []
+    created: list[Path] = []
     tmp: Path | None = None
+
+    def make_dirs(directory: Path) -> None:
+        missing = []
+        while not directory.exists() and directory != directory.parent:  # a missing drive ends the walk
+            missing.append(directory)
+            directory = directory.parent
+        for d in reversed(missing):
+            d.mkdir(exist_ok=True)
+            created.append(d)
+
     try:
-        out.mkdir(parents=True, exist_ok=True)
+        make_dirs(out)
         for name, data in files.items():
             target = out / name
-            target.parent.mkdir(parents=True, exist_ok=True)
+            make_dirs(target.parent)
             tmp = target.with_name(f"{target.name}.tmp.{os.getpid()}")
             with open(tmp, "wb") as handle:
                 handle.write(data)
@@ -150,5 +162,10 @@ def write_files(out: Path, files: Mapping[str, bytes]) -> list[Path]:
             tmp.unlink(missing_ok=True)
         for path in written:
             path.unlink(missing_ok=True)
+        for directory in sorted(created, key=lambda d: len(d.parts), reverse=True):
+            try:
+                directory.rmdir()  # only if empty: a directory another writer filled meanwhile stays
+            except OSError:
+                pass
         raise RunError("WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}") from exc
     return written

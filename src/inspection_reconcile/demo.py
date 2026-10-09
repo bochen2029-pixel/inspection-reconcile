@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,7 @@ from inspection_reconcile.errors import RunError
 from inspection_reconcile.io.writer import json_bytes, prepare_out, write_files
 from inspection_reconcile.oracle import check, load_oracle
 from inspection_reconcile.report.compare import compare
-from inspection_reconcile.runner import Evaluation, evaluate, normalized_export
+from inspection_reconcile.runner import Evaluation, evaluate, evaluate_export
 from inspection_reconcile.vocab import EXIT_DEMO_MISMATCH, EXIT_OK, STATUS_EXIT
 
 COMPARISON_DIR = "compare-S02-S06"
@@ -79,23 +79,15 @@ class ScenarioResult:
 def _evaluate(
     repo: Path, fixtures: Path, scenario_id: str, spec: dict[str, Any], home: Path
 ) -> tuple[Evaluation, dict[str, bytes]]:
-    """Assess one scenario. An export scenario is normalized first (SPEC §11); its snapshot is returned as bytes,
-    to be written under ``home`` (``<out>/<scenario>/snapshot``) with the other outputs, and the run manifest
-    records the inputs at those final paths."""
+    """Assess one scenario. An export scenario is normalized first (SPEC §11): its snapshot comes back as bytes,
+    to be written under ``home`` (``<out>/<scenario>/snapshot``) with the other outputs, and its run manifest
+    records the snapshot's files at those final paths."""
     fixture_dir = fixtures / spec.get("fixture", scenario_id)
     policy = repo / "policies" / f"{spec.get('policy', 'north-creek-demo')}.yml"
     if not (fixture_dir / "export").is_dir():
         return evaluate(fixture_dir / "snapshot", policy), {}
-    with normalized_export(fixture_dir / "export", repo / "mappings" / "quickbase-demo.yml") as (snap, info):
-        evaluation = evaluate(snap, policy, mapping=info)
-        files = {
-            p.relative_to(snap).as_posix(): p.read_bytes() for p in sorted(snap.rglob("*")) if p.is_file()
-        }
-        inputs = [
-            (role, home / path.relative_to(snap) if path.is_relative_to(snap) else path, size, sha)
-            for role, path, size, sha in evaluation.inputs
-        ]
-    return replace(evaluation, inputs=inputs), files
+    mapping = repo / "mappings" / "quickbase-demo.yml"
+    return evaluate_export(fixture_dir / "export", mapping, policy, home=home)
 
 
 def run_demo(

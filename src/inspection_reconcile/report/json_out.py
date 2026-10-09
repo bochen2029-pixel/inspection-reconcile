@@ -68,7 +68,7 @@ def relative_or_absolute(path: Path) -> str:
 def run_manifest_bytes(
     assessment: Assessment,
     provenance_id: str,
-    inputs: list[tuple[str, Path, int, str]],
+    inputs: list[tuple[str, Path | None, int, str]],
     mapping: dict[str, str] | None = None,
 ) -> bytes:
     policy = assessment.policy
@@ -82,8 +82,13 @@ def run_manifest_bytes(
         "generated_at": format_ts(datetime.now(UTC)),
         "as_of": assessment.as_of,
         "policy": {"pack_id": policy.pack_id, "version": policy.version, "sha256": policy.sha256},
-        "inputs": [
-            {"role": role, "path": relative_or_absolute(path), "bytes": size, "sha256": sha}
+        "inputs": [  # a null path: the file existed only in a removed temporary directory (assess --export)
+            {
+                "role": role,
+                "path": relative_or_absolute(path) if path is not None else None,
+                "bytes": size,
+                "sha256": sha,
+            }
             for role, path, size, sha in inputs
         ],
         "mapping": mapping,

@@ -1,20 +1,31 @@
 """Output-surface regressions from the T5 review (SPEC §9.6, §11): --force for normalize and capture-quickbase,
 the demo's normalized snapshot, --log-json for library log records, index links, compare's input checks."""
 
+import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from conftest import POLICIES, REPO, SCENARIOS
 
-from inspection_reconcile import cli, demo
+from inspection_reconcile import cli, demo, runner
 from inspection_reconcile.adapters import qb_capture
 from inspection_reconcile.errors import RunError
+from inspection_reconcile.io import writer
 from inspection_reconcile.oracle import load_oracle
 from inspection_reconcile.runner import evaluate
-from inspection_reconcile.vocab import EXIT_DEMO_MISMATCH, EXIT_OK, EXIT_RUN_ERROR
+from inspection_reconcile.vocab import (
+    EXIT_BLOCKED,
+    EXIT_COMPARE_DIFF,
+    EXIT_DEMO_MISMATCH,
+    EXIT_OK,
+    EXIT_RUN_ERROR,
+)
 
 MAPPING = str(REPO / "mappings" / "quickbase-demo.yml")
 POLICY = POLICIES / "north-creek-demo.yml"
@@ -137,7 +148,16 @@ def test_demo_writes_the_normalized_snapshot_of_an_export_scenario(tmp_path):
     assessment = json.loads((home / "assessment.json").read_text(encoding="utf-8"))
     assert evaluate(snapshot, POLICY).assessment.evaluation_id == assessment["evaluation_id"]
     inputs = json.loads((home / "run-manifest.json").read_text(encoding="utf-8"))["inputs"]
-    assert {i["role"] for i in inputs} >= {"manifest", "inspections", "normalization", "policy"}
+    roles = {
+        "manifest",
+        "inspections",
+        "normalization",
+        "export_manifest",
+        "export_table",
+        "mapping",
+        "policy",
+    }
+    assert {i["role"] for i in inputs} >= roles
     for item in inputs:  # every recorded input still exists after the run (SPEC §9.3)
         assert Path(item["path"]).is_file(), item
 
@@ -217,3 +237,155 @@ def test_compare_refuses_a_malformed_assessment(tmp_path, capsys):
     assert cli.main(["compare", "--before", str(good), "--after", str(bad)]) == EXIT_RUN_ERROR
     err = capsys.readouterr().err
     assert "COMPARE_INPUT_INVALID" in err and "INTERNAL_ERROR" not in err
+
+
+# -- compare --out [--force] (SPEC §11) ---------------------------------------------------------------------
+
+
+def assessments(tmp_path: Path) -> tuple[Path, Path]:
+    a, b = tmp_path / "a", tmp_path / "b"
+    for sid, out in (("S02-missing-inspection", a), ("S06-corrected", b)):
+        snapshot = SCENARIOS / sid / "snapshot"
+        code = cli.main(["assess", "--snapshot", str(snapshot), "--policy", str(POLICY), "--out", str(out)])
+        assert code in (EXIT_OK, EXIT_BLOCKED)
+    return a, b
+
+
+def test_compare_out_replaces_an_existing_file_only_with_force(tmp_path, capsys):
+    a, b = assessments(tmp_path)
+    target = tmp_path / "cmp.json"
+    target.write_text("keep", encoding="utf-8")
+    capsys.readouterr()
+    assert (
+        cli.main(["compare", "--before", str(a), "--after", str(b), "--out", str(target)]) == EXIT_RUN_ERROR
+    )
+    assert "OUT_EXISTS" in capsys.readouterr().err
+    assert target.read_text(encoding="utf-8") == "keep"
+    code = cli.main(["compare", "--before", str(a), "--after", str(b), "--out", str(target), "--force"])
+    assert code == EXIT_COMPARE_DIFF
+    assert json.loads(target.read_text(encoding="utf-8"))["schema"] == "inspection-reconcile/comparison/v1"
+
+
+def test_compare_out_never_names_an_input(tmp_path, capsys):
+    a, b = assessments(tmp_path)
+    original = (a / "assessment.json").read_bytes(), (b / "assessment.json").read_bytes()
+    capsys.readouterr()
+    for out in (a / "assessment.json", b / ".." / "a" / "assessment.json", b / "assessment.json"):
+        argv = ["compare", "--before", str(a / "assessment.json"), "--after", str(b), "--out", str(out)]
+        assert cli.main([*argv, "--force"]) == EXIT_RUN_ERROR
+        assert "COMPARE_OUT_IS_INPUT" in capsys.readouterr().err
+    assert ((a / "assessment.json").read_bytes(), (b / "assessment.json").read_bytes()) == original
+
+
+# -- assess --export: the run manifest records every input that was read (SPEC §9.3) --------------------------
+
+
+def canonical(value) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def test_assess_export_records_the_export_files_and_the_mapping(tmp_path):
+    out = tmp_path / "o"
+    argv = ["assess", "--export", str(S16), "--mapping", MAPPING, "--policy", str(POLICY), "--out", str(out)]
+    assert cli.main(argv) == EXIT_OK
+    manifest = json.loads((out / "run-manifest.json").read_text(encoding="utf-8"))
+    inputs = manifest["inputs"]
+    assert inputs == sorted(inputs, key=lambda i: (i["role"], i["path"] or ""))
+    # The normalized snapshot lived in a temporary directory that no longer exists: its paths are null.
+    snapshot_roles = {
+        "manifest",
+        "project",
+        "scope",
+        "inspections",
+        "artifacts",
+        "approvals",
+        "normalization",
+    }
+    assert {i["role"] for i in inputs if i["path"] is None} == snapshot_roles
+    # Everything else is a real file, recorded with its size and digest.
+    read = {Path(i["path"]).resolve(): i for i in inputs if i["path"] is not None}
+    tables = {p.resolve() for p in (S16 / "tables").rglob("*.json") if p.name != "pass2.json"}
+    expected = {(S16 / "capture-manifest.json").resolve(), Path(MAPPING).resolve(), POLICY.resolve(), *tables}
+    assert set(read) == expected
+    for path, item in read.items():
+        data = path.read_bytes()
+        assert (item["bytes"], item["sha256"]) == (len(data), hashlib.sha256(data).hexdigest()), path
+    assert read[(S16 / "capture-manifest.json").resolve()]["role"] == "export_manifest"
+    assert {read[p]["role"] for p in tables} == {"export_table"}
+    assert read[Path(MAPPING).resolve()]["role"] == "mapping"
+    # Every input enters provenance_id (SPEC §8.5).
+    provenance = {
+        "scheme": "inspection-reconcile/provenance/v1",
+        "evaluation_id": manifest["evaluation_id"],
+        "inputs": sorted(({"role": i["role"], "sha256": i["sha256"]} for i in inputs), key=canonical),
+        "mapping_sha256": manifest["mapping"]["sha256"],
+    }
+    expected_id = "sha256:" + hashlib.sha256(canonical(provenance).encode("utf-8")).hexdigest()
+    assert manifest["provenance_id"] == expected_id
+    assessment = json.loads((out / "assessment.json").read_text(encoding="utf-8"))
+    assert assessment["provenance_id"] == expected_id
+
+
+def test_the_policy_digest_comes_from_the_bytes_load_policy_read(monkeypatch):
+    real = runner.load_policy
+    sentinel = "f" * 64  # what load_policy reports; a second read of the file would give the real digest
+    monkeypatch.setattr(runner, "load_policy", lambda path: replace(real(path), raw_bytes_sha256=sentinel))
+    evaluation = runner.evaluate(SCENARIOS / "S01-clean" / "snapshot", POLICY)
+    assert [(size, sha) for role, _, size, sha in evaluation.inputs if role == "policy"] == [
+        (POLICY.stat().st_size, sentinel)
+    ]
+
+
+# -- --log-json after the command; --mapping only with --export (SPEC §11) ------------------------------------
+
+
+def test_log_json_is_accepted_before_or_after_the_command(tmp_path, capsys):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "x").write_text("x", encoding="utf-8")
+    snapshot = str(SCENARIOS / "S01-clean" / "snapshot")
+    argv = ["assess", "--snapshot", snapshot, "--policy", str(POLICY), "--out", str(out)]
+    for args in (["--log-json", *argv], [*argv, "--log-json"], ["--log-json", *argv, "--log-json"]):
+        assert cli.main(args) == EXIT_RUN_ERROR
+        assert json.loads(capsys.readouterr().err.strip().splitlines()[-1])["code"] == "OUT_NOT_EMPTY"
+    assert cli.main(argv) == EXIT_RUN_ERROR
+    assert capsys.readouterr().err.startswith("error: OUT_NOT_EMPTY")
+
+
+def test_assess_snapshot_refuses_a_mapping(tmp_path, capsys):
+    out = tmp_path / "o"
+    snapshot = str(SCENARIOS / "S01-clean" / "snapshot")
+    argv = [
+        "assess",
+        "--snapshot",
+        snapshot,
+        "--mapping",
+        MAPPING,
+        "--policy",
+        str(POLICY),
+        "--out",
+        str(out),
+    ]
+    assert cli.main(argv) == EXIT_RUN_ERROR
+    assert "USAGE" in capsys.readouterr().err
+    assert not out.exists()
+
+
+# -- a failed write leaves no directories behind (SPEC §9.6) -------------------------------------------------
+
+
+def test_a_failed_write_removes_the_directories_it_created(tmp_path, monkeypatch):
+    real = os.replace
+    calls: list[str] = []
+
+    def flaky(src, dst):
+        calls.append(str(dst))
+        if len(calls) == 2:
+            raise OSError(28, "No space left on device")
+        return real(src, dst)
+
+    monkeypatch.setattr(writer.os, "replace", flaky)
+    with pytest.raises(RunError) as failure:
+        writer.write_files(tmp_path / "new" / "deep", {"x/a.json": b"{}\n", "y/b.json": b"{}\n"})
+    assert failure.value.code == "WRITE_FAILED"
+    assert list(tmp_path.iterdir()) == []
