@@ -534,3 +534,30 @@ def test_a_table_the_mapping_does_not_map_is_refused(tmp_path: Path, mapping: Ma
     with pytest.raises(RunError) as info:
         normalize(export, mapping, tmp_path / "snapshot")
     assert info.value.code == "EXPORT_INVALID"
+
+
+@pytest.mark.parametrize("paging", [None, "keyset", "skip"])
+def test_tables_paging_is_optional_and_semantically_ignored(
+    tmp_path: Path, mapping: Mapping, paging: str | None
+) -> None:
+    """§12.1 fallback: capture records tables[].paging; fixture exports omit it; normalize ignores it."""
+    export = copy_export(tmp_path)
+    if paging is not None:
+        edit_json(
+            export / "capture-manifest.json",
+            lambda m: [t.update(paging=paging) for t in m["tables"].values()],
+        )
+    manifest = json.loads((export / "capture-manifest.json").read_text(encoding="utf-8"))
+    assert parse_export_manifest(manifest)["tables"]["inspections"].get("paging") == paging
+    out = tmp_path / "snapshot"
+    normalize(export, mapping, out)
+    assert run(out).assessment_semantic_sha256 == ss.run_scenario("S01-clean").assessment_semantic_sha256
+
+
+@pytest.mark.parametrize("bad", ["offset", "", "KEYSET", 1, None])
+def test_an_unknown_paging_value_is_refused(bad: Any) -> None:
+    manifest = json.loads((S16 / "capture-manifest.json").read_text(encoding="utf-8"))
+    manifest["tables"]["obligations"]["paging"] = bad
+    with pytest.raises(RunError) as info:
+        parse_export_manifest(manifest)
+    assert info.value.code == "CONFIG_INVALID"

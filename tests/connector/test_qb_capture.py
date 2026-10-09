@@ -648,7 +648,51 @@ def test_skip_paging_detects_an_insert_during_the_read(
     manifest = run_capture(client, mapping, tmp_path / "export")
     assert manifest["tables"]["inspections"]["paging"] == "skip"
     assert manifest["tables"]["inspections"]["two_pass"] == "changed"
-    assert manifest["datasets"]["inspections"]["coverage"] == "partial"
+    assert manifest["datasets"]["inspections"] == {
+        "coverage": "partial",
+        "basis": ["pagination_incomplete"],
+        "consistency": "changed_during_capture",
+    }
+
+
+def test_skip_paging_detects_a_delete_during_the_read(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    state = {"skip_pages": 0}
+
+    def delete_after_first_page(request: httpx.Request, body: Any) -> None:
+        if body and body.get("from") == "bsyn00002" and "where" not in body and body["select"] != [2, 3]:
+            state["skip_pages"] += 1
+            if state["skip_pages"] == 2:  # a record already read disappears: later offsets shift
+                app.records["bsyn00002"] = [r for r in app.records["bsyn00002"] if r["3"]["value"] != 101]
+        return None
+
+    app.hooks.append(delete_after_first_page)
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    assert manifest["tables"]["inspections"]["paging"] == "skip"
+    assert manifest["datasets"]["inspections"] == {
+        "coverage": "partial",
+        "basis": ["pagination_incomplete"],
+        "consistency": "changed_during_capture",
+    }
+
+
+def test_skip_paging_reads_through_short_intelligent_pages(
+    tmp_path: Path, app: MockApp, client: QuickbaseClient, mapping: Mapping
+) -> None:
+    app.refuse_gt = True
+    app.short_pages[("bsyn00002", 2)] = 7  # the refused keyset query is not counted by the mock
+    manifest = run_capture(client, mapping, tmp_path / "export")
+    inspections = manifest["tables"]["inspections"]
+    assert (inspections["paging"], inspections["pages"], inspections["retrieved"]) == ("skip", 5, 40)
+    skips = [
+        q["options"]["skip"]
+        for q in app.queries
+        if q["from"] == "bsyn00002" and "where" not in q and q["select"] != [2, 3]
+    ]
+    assert skips == [0, 15, 22, 37, 40]
+    assert manifest["datasets"]["inspections"]["coverage"] == "complete_for_declared_scope"
 
 
 def test_a_refusal_after_the_first_page_is_a_run_error(
