@@ -612,11 +612,11 @@ uv run python tools/qb_build_test_app.py --realm example.quickbase.com
 ```
 
 > [!NOTE]
-> The builder is the only code in the repository that writes to Quickbase, and the package never imports it. Its
-> client allows six create and read operations, and refuses before any I/O every id that did not come from a
-> response in the same run. So it only creates, and only inside the app it has just created. A failed write is
-> never repeated. If a build stops part way, the message names the app for you to delete, because the tool never
-> deletes anything (SPEC §22.17).
+> The builder is the only code in the repository that writes to Quickbase, and the package never imports it. It
+> allows six create and read operations. Before any I/O, it refuses every app, table, field and record id that did
+> not come from a response in the same run, and its client refuses any upsert that could update a record. So it
+> only creates, and only inside the app it has just created. A failed write is never repeated. If a build stops
+> part way, the message names the app for you to delete, because the tool never deletes anything (SPEC §22.17).
 
 ## Security model
 
