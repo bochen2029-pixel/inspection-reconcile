@@ -36,6 +36,7 @@ NORMALIZE_DIRS = ("evidence",)
 CAPTURE_OUTPUTS = ("capture-manifest.json",)
 CAPTURE_DIRS = ("tables", "files")
 STAGING_PREFIX = ".staging-"
+PREVIOUS_PREFIX = ".previous-"  # the previous output, moved aside while a --force swap runs
 
 
 def json_bytes(value: Any) -> bytes:
@@ -84,17 +85,63 @@ def replacing_out(
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
         raise
+    _swap(out, previous, stage)
+
+
+def _swap(out: Path, previous: list[Path], stage: Path) -> None:
+    """Replace the previous output with the staged one, all or nothing.
+
+    Both phases are renames inside --out: the previous output moves aside into a backup directory, then the staged
+    output moves in. If any rename fails (on Windows a file held open by another program, Excel with a CSV for
+    example, can be neither renamed nor deleted), every completed rename is undone, so --out is exactly as it was.
+    The previous output is deleted only after the new one is in place."""
+    aside: list[str] = []
+    moved_in: list[str] = []
+    try:
+        backup = Path(tempfile.mkdtemp(prefix=PREVIOUS_PREFIX, dir=out))
+    except OSError as exc:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise RunError(
+            "WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}; --out is unchanged"
+        ) from exc
     try:
         for entry in previous:
-            if entry.is_dir():
-                shutil.rmtree(entry)
-            else:
-                entry.unlink()
+            os.replace(entry, backup / entry.name)
+            aside.append(entry.name)
         for entry in sorted(stage.iterdir()):
             os.replace(entry, out / entry.name)
-        stage.rmdir()
+            moved_in.append(entry.name)
     except OSError as exc:
-        raise RunError("WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}") from exc
+        stuck = [name for name in reversed(moved_in) if not _rename(out / name, stage / name)]
+        lost = sorted(name for name in reversed(aside) if not _rename(backup / name, out / name))
+        extra = sorted(set(stuck) - set(aside))  # this run's names that the previous output had no entry for
+        shutil.rmtree(stage, ignore_errors=True)
+        problems: list[str] = []
+        if lost:  # the backup is kept and named: it holds the only copy
+            problems.append(f"the previous {', '.join(lost)} could not be put back from {backup.as_posix()}")
+        else:
+            _rmdir(backup)  # empty again
+        if extra:
+            problems.append(f"this run's {', '.join(extra)} could not be taken out of --out")
+        outcome = "; ".join(problems) if problems else "--out is unchanged"
+        raise RunError("WRITE_FAILED", f"{out.as_posix()}: {exc.strerror or exc}; {outcome}") from exc
+    shutil.rmtree(backup, ignore_errors=True)  # the old output, no longer reachable from --out
+    shutil.rmtree(stage, ignore_errors=True)  # empty by now
+
+
+def _rmdir(directory: Path) -> None:
+    try:
+        directory.rmdir()
+    except OSError:
+        pass
+
+
+def _rename(src: Path, dst: Path) -> bool:
+    try:
+        os.replace(src, dst)
+    except OSError:
+        return False
+    return True
 
 
 def _replaceable(out: Path, force: bool, files: set[str], dirs: set[str]) -> list[Path]:
@@ -111,9 +158,13 @@ def _replaceable(out: Path, force: bool, files: set[str], dirs: set[str]) -> lis
     foreign = [e.name for e in entries if not _owned(e, files, dirs)]
     if foreign:
         shown = ", ".join(foreign[:5]) + (f" (and {len(foreign) - 5} more)" if len(foreign) > 5 else "")
+        hint = ""
+        if any(name.startswith(PREVIOUS_PREFIX) for name in foreign):  # never deleted: the only copy, maybe
+            hint = f"; {PREVIOUS_PREFIX}* is an earlier output that a failed --force run set aside: restore or delete it"
         raise RunError(
             "OUT_NOT_EMPTY",
-            f"{out.as_posix()}: --force replaces only this command's own previous output, and it also holds {shown}",
+            f"{out.as_posix()}: --force replaces only this command's own previous output, and it also holds {shown}"
+            + hint,
         )
     return entries
 
