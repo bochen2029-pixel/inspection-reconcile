@@ -191,7 +191,7 @@ def cmd_export_sqlite(args: argparse.Namespace) -> int:
 
     out = Path(args.out)
     if out.exists() and not args.force:
-        raise RunError("OUT_EXISTS", f"{out}: exists (use --force)")
+        raise RunError("OUT_EXISTS", f"{out.as_posix()}: exists (use --force)")
     export_sqlite(load_snapshot(Path(args.snapshot)), load_policy(Path(args.policy)), out)
     print(f"SQLite export written to {out.as_posix()}")
     return EXIT_OK

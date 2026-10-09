@@ -48,6 +48,9 @@ class Shot:
     keep: tuple[str, ...] | None
     width: int
     dark: bool  # also write <name>-dark.png with the report's dark palette
+    # Data rows (first, last; 1-based) to keep in the tables of the kept sections; None keeps them all.
+    rows: tuple[int, int] | None = None
+    header: bool = True  # keep the report header (banner, title, status) above the kept sections
 
 
 SHOTS = (
@@ -62,6 +65,32 @@ SHOTS = (
     Shot("report-s08-root", "S08-silent-byte-change/report.html", ("Root findings",), 1200, True),
     Shot("report-s05-unknown", "S05-incomplete-capture/report.html", ("Coverage", "Summary"), 1200, True),
     Shot("report-s02-grid", "S02-missing-inspection/report.html", ("Obligations",), 1200, False),
+    # The guides (docs/guide): a narrower width keeps the text legible on a printed page.
+    Shot("guide-s02-header", "S02-missing-inspection/report.html", ("What this result means",), 880, False),
+    Shot("guide-s05-coverage", "S05-incomplete-capture/report.html", ("Coverage", "Summary"), 880, False),
+    Shot("guide-s02-root", "S02-missing-inspection/report.html", ("Root findings",), 880, False),
+    Shot(
+        "guide-s02-grid", "S02-missing-inspection/report.html", ("Obligations",), 880, False, (14, 20), False
+    ),
+    Shot(
+        "guide-s02-findings",
+        "S02-missing-inspection/report.html",
+        ("All findings",),
+        880,
+        False,
+        (20, 26),
+        False,
+    ),
+    Shot(
+        "guide-s02-provenance", "S02-missing-inspection/report.html", ("Provenance",), 880, False, None, False
+    ),
+    Shot("guide-s06-ready", "S06-corrected/report.html", ("Summary", "Root findings"), 880, False),
+    Shot("guide-s08-root", "S08-silent-byte-change/report.html", ("Root findings",), 880, False),
+    Shot(
+        "guide-s12-root", "S12-attachment-not-captured/report.html", ("Coverage", "Root findings"), 880, False
+    ),
+    Shot("guide-s17-root", "S17-quickbase-unmapped-value/report.html", ("Root findings",), 880, False),
+    Shot("guide-demo-index", "index.html", None, 880, False),
 )
 
 
@@ -79,13 +108,21 @@ def find_browser(explicit: str | None) -> str:
     raise SystemExit("no Chrome, Chromium or Edge found; pass --browser PATH")
 
 
-def shot_script(keep: tuple[str, ...] | None) -> str:
+def shot_script(
+    keep: tuple[str, ...] | None, rows: tuple[int, int] | None = None, header: bool = True
+) -> str:
     return (
         "<script>(function(){var keep=" + json.dumps(list(keep) if keep else None) + ";"
+        "var rows=" + json.dumps(list(rows) if rows else None) + ";"
+        "var header=" + json.dumps(header) + ";"
         "var main=document.querySelector('main')||document.body;"
         "if(keep){var section='';Array.prototype.forEach.call(main.children,function(el){"
         "if(el.tagName==='H2'){section=el.textContent.trim();}"
-        "if(section!==''&&keep.indexOf(section)<0){el.style.display='none';}});}"
+        "if((section===''&&!header)||(section!==''&&keep.indexOf(section)<0)){el.style.display='none';}});}"
+        # A row window: in every table still shown, keep only data rows first..last (a header row has a <th>).
+        "if(rows){Array.prototype.forEach.call(main.querySelectorAll('table'),function(t){var n=0;"
+        "Array.prototype.forEach.call(t.rows,function(r){if(r.querySelector('th')&&!r.querySelector('td')){return;}"
+        "n+=1;if(n<rows[0]||n>rows[1]){r.style.display='none';}});});}"
         "document.body.setAttribute('data-shot-height',"
         "String(Math.ceil(document.body.getBoundingClientRect().height)));})();</script>"
     )
@@ -100,7 +137,7 @@ def prepare_copy(page: Path, shot: Shot, dark: bool) -> Path:
     if dark and DARK_QUERY not in html:
         raise SystemExit(f"{page}: no dark palette to force")
     html = html.replace(DARK_QUERY, "@media all {" if dark else "@media not all {", 1)
-    html = html.replace("</body>", shot_script(shot.keep) + "</body>", 1)
+    html = html.replace("</body>", shot_script(shot.keep, shot.rows, shot.header) + "</body>", 1)
     copy = page.with_name(f".shot-{shot.name}{'-dark' if dark else ''}.html")
     copy.write_text(html, encoding="utf-8", newline="\n")
     return copy

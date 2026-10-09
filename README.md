@@ -44,6 +44,15 @@ uv run inspection-reconcile demo --all --out out/demo
 `demo --all` assesses every fixture scenario, checks each result against the hand-written oracle in
 `fixtures/oracle.yaml`, and writes `out/demo/index.html` with a report per scenario.
 
+## Documentation
+
+| guide | for | read it as |
+|---|---|---|
+| **User Guide** | running assessments, reading the report, acting on findings | [PDF](docs/guide/inspection-reconcile-user-guide.pdf) · [Word](docs/guide/inspection-reconcile-user-guide.docx) · [Markdown](docs/guide/user-guide.md) |
+| **Administrator Guide** | installing, requirement packs, the snapshot format, Quickbase, security, operations | [PDF](docs/guide/inspection-reconcile-admin-guide.pdf) · [Word](docs/guide/inspection-reconcile-admin-guide.docx) · [Markdown](docs/guide/admin-guide.md) |
+
+Every command and exit code in the guides was run as printed, and `tests/meta/test_guides.py` keeps them honest.
+
 ## The demonstration in four steps
 
 ```bash
@@ -223,7 +232,8 @@ from Appendix D of the spec.
 | `fixtures/` | the oracle and the 24 scenario snapshots and exports |
 | `policies/`, `mappings/` | the demonstration requirement packs and the Quickbase field mapping |
 | `sql/` | the SQL cross-check queries |
-| `tools/` | the independent fixture generator and the screenshot script |
+| `tools/` | the independent fixture generator, the screenshot script and the guide builder |
+| `docs/guide/` | the User Guide and the Administrator Guide: Markdown sources, PDF and Word |
 | `docs/SPEC.md` | the normative specification; §22 is the amendment register |
 | `docs/decisions.md` | decisions and amendments |
 | `docs/status.md` | build steps, and the invariant and acceptance-criteria audit |

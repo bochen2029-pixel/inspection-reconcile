@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" width="800" height="700" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" role="img" aria-labelledby="title desc">
+  <title id="title">inspection-reconcile architecture</title>
+  <desc id="desc">A Quickbase app is read by capture-quickbase into an export folder, which normalize turns into a canonical snapshot through a field mapping. Any other system writes the canonical snapshot directly. The engine reads the snapshot and a requirement pack and writes report.html, assessment.json and run-manifest.json; compare and export-sqlite work on its results.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6475"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="800" height="700" fill="#ffffff"/>
+
+  <!-- lane: Quickbase -->
+  <text x="20" y="24" font-size="12" font-weight="600" fill="#2c5282" letter-spacing="1">QUICKBASE PATH</text>
+  <rect x="20" y="36" width="220" height="80" rx="8" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+  <text x="130" y="68" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">Quickbase app</text>
+  <text x="130" y="92" text-anchor="middle" font-size="13" fill="#5b6475">tables, fields, attachments</text>
+
+  <rect x="290" y="36" width="220" height="80" rx="8" fill="#f4f6f9" stroke="#5b6475" stroke-width="1.5"/>
+  <text x="400" y="62" text-anchor="middle" font-size="15" font-weight="600" fill="#1d2330" font-family="Cascadia Mono, Consolas, monospace">capture-quickbase</text>
+  <text x="400" y="84" text-anchor="middle" font-size="13" fill="#5b6475">read-only, rate-limited,</text>
+  <text x="400" y="102" text-anchor="middle" font-size="13" fill="#5b6475">two-pass consistency check</text>
+
+  <rect x="560" y="36" width="220" height="80" rx="8" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+  <text x="670" y="62" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">Quickbase-shaped export</text>
+  <text x="670" y="84" text-anchor="middle" font-size="13" fill="#5b6475">capture-manifest.json,</text>
+  <text x="670" y="102" text-anchor="middle" font-size="13" fill="#5b6475">API responses, files</text>
+
+  <rect x="290" y="150" width="220" height="70" rx="8" fill="#ffffff" stroke="#5b6475" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="400" y="178" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">field mapping (YAML)</text>
+  <text x="400" y="201" text-anchor="middle" font-size="13" fill="#5b6475">field IDs, types, value maps</text>
+
+  <rect x="560" y="150" width="220" height="70" rx="8" fill="#f4f6f9" stroke="#5b6475" stroke-width="1.5"/>
+  <text x="670" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#1d2330" font-family="Cascadia Mono, Consolas, monospace">normalize</text>
+  <text x="670" y="201" text-anchor="middle" font-size="13" fill="#5b6475">never guesses a value</text>
+
+  <!-- lane: any other source -->
+  <text x="20" y="262" font-size="12" font-weight="600" fill="#2c5282" letter-spacing="1">ANY OTHER SOURCE</text>
+  <rect x="20" y="274" width="220" height="74" rx="8" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+  <text x="130" y="304" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">Another system</text>
+  <text x="130" y="327" text-anchor="middle" font-size="13" fill="#5b6475">writes the canonical format</text>
+
+  <rect x="290" y="330" width="220" height="74" rx="8" fill="#ffffff" stroke="#5b6475" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="400" y="358" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">requirement pack (YAML)</text>
+  <text x="400" y="381" text-anchor="middle" font-size="13" fill="#5b6475">documents, bases, binding</text>
+
+  <rect x="560" y="254" width="220" height="150" rx="8" fill="#ffffff" stroke="#1d2330" stroke-width="2"/>
+  <text x="670" y="284" text-anchor="middle" font-size="16" font-weight="600" fill="#1d2330">Canonical snapshot</text>
+  <text x="670" y="308" text-anchor="middle" font-size="13" fill="#5b6475">manifest.json, project.json</text>
+  <text x="670" y="328" text-anchor="middle" font-size="13" fill="#5b6475">scope, inspections,</text>
+  <text x="670" y="348" text-anchor="middle" font-size="13" fill="#5b6475">artifacts, approvals (CSV)</text>
+  <text x="670" y="368" text-anchor="middle" font-size="13" fill="#5b6475">evidence/ (the files)</text>
+  <text x="670" y="390" text-anchor="middle" font-size="11.5" fill="#8a93a3">coverage claims with a basis</text>
+
+  <!-- lane: assessment -->
+  <text x="20" y="440" font-size="12" font-weight="600" fill="#2c5282" letter-spacing="1">ASSESSMENT</text>
+  <rect x="20" y="452" width="760" height="128" rx="10" fill="#e8eef7" stroke="#2c5282" stroke-width="2"/>
+  <text x="36" y="476" font-size="16" font-weight="600" fill="#1d2330">Engine</text>
+  <text x="96" y="476" font-size="13" fill="#2c5282">pure, deterministic, identical on every operating system</text>
+  <g font-size="13" fill="#1d2330" text-anchor="middle">
+    <rect x="36" y="490" width="166" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="119" y="512">load and validate</text>
+    <rect x="222" y="490" width="166" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="305" y="512">R0 input integrity</text>
+    <rect x="408" y="490" width="166" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="491" y="512">evidence probe (SHA-256)</text>
+    <rect x="594" y="490" width="170" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="679" y="512">R1 scope and coverage</text>
+    <rect x="36" y="534" width="230" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="151" y="556">R2–R6 for each obligation</text>
+    <rect x="286" y="534" width="230" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="401" y="556">R7 unmatched (advisory)</text>
+    <rect x="536" y="534" width="228" height="34" rx="5" fill="#ffffff" stroke="#9fb3d1"/>
+    <text x="650" y="556">status and identities</text>
+  </g>
+  <g stroke="#9fb3d1" stroke-width="1.2" fill="none" marker-end="url(#arrow)">
+    <line x1="202" y1="507" x2="220" y2="507"/>
+    <line x1="388" y1="507" x2="406" y2="507"/>
+    <line x1="574" y1="507" x2="592" y2="507"/>
+    <path d="M 679 524 L 679 529 L 151 529 L 151 532"/>
+    <line x1="266" y1="551" x2="284" y2="551"/>
+    <line x1="516" y1="551" x2="534" y2="551"/>
+  </g>
+
+  <!-- outputs -->
+  <g font-family="Cascadia Mono, Consolas, monospace" font-size="13.5" fill="#1d2330" text-anchor="middle">
+    <rect x="20" y="614" width="140" height="44" rx="6" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+    <text x="90" y="641">report.html</text>
+    <rect x="175" y="614" width="150" height="44" rx="6" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+    <text x="250" y="641">assessment.json</text>
+    <rect x="340" y="614" width="160" height="44" rx="6" fill="#ffffff" stroke="#5b6475" stroke-width="1.5"/>
+    <text x="420" y="641">run-manifest.json</text>
+  </g>
+  <g font-size="12" fill="#5b6475" text-anchor="middle">
+    <rect x="515" y="614" width="125" height="44" rx="6" fill="#f4f6f9" stroke="#5b6475" stroke-width="1.2"/>
+    <text x="577" y="632" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#1d2330">compare</text>
+    <text x="577" y="650">comparison.json</text>
+    <rect x="655" y="614" width="125" height="44" rx="6" fill="#f4f6f9" stroke="#5b6475" stroke-width="1.2"/>
+    <text x="717" y="632" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#1d2330">export-sqlite</text>
+    <text x="717" y="650">SQL cross-check</text>
+  </g>
+  <text x="400" y="688" text-anchor="middle" font-size="12.5" fill="#5b6475">exit code 0 ready for review · 10 blocked · 11 unknown · 2 run error</text>
+
+  <!-- arrows between lanes -->
+  <g stroke="#5b6475" stroke-width="1.6" fill="none" marker-end="url(#arrow)">
+    <line x1="240" y1="76" x2="288" y2="76"/>
+    <line x1="510" y1="76" x2="558" y2="76"/>
+    <line x1="670" y1="116" x2="670" y2="148"/>
+    <line x1="510" y1="185" x2="558" y2="185"/>
+    <line x1="670" y1="220" x2="670" y2="252"/>
+    <line x1="240" y1="300" x2="558" y2="300"/>
+    <line x1="670" y1="404" x2="670" y2="450"/>
+    <line x1="400" y1="404" x2="400" y2="450"/>
+    <line x1="90" y1="580" x2="90" y2="612"/>
+    <line x1="250" y1="580" x2="250" y2="612"/>
+    <line x1="420" y1="580" x2="420" y2="612"/>
+    <line x1="577" y1="580" x2="577" y2="612"/>
+    <line x1="717" y1="580" x2="717" y2="612"/>
+  </g>
+  <text x="534" y="68" text-anchor="middle" font-size="11.5" fill="#5b6475">writes</text>
+  <text x="400" y="292" text-anchor="middle" font-size="11.5" fill="#5b6475">writes directly</text>
+</svg>
