@@ -78,6 +78,9 @@ uv run inspection-reconcile assess --snapshot fixtures/scenarios/S01-clean/snaps
 uv run inspection-reconcile compare --before local/c3/s01 --after local/c3/live --out local/c3/compare.json
 ```
 
+To run this step again, add `--force` to each command. Without it, the commands refuse to replace their earlier
+output (`OUT_NOT_EMPTY`, or `OUT_EXISTS` for `compare --out`).
+
 **Expected result.** The live assessment is `READY_FOR_REVIEW` (exit 0). `compare` exits 20 even so: the
 coverage basis and other capture-dependent values differ by design (D-005), and so does `evaluation_id`. The check
 is that no finding was added or removed, and that none changed its outcome or reason:

@@ -968,7 +968,7 @@ def quickbase_import(dest: Path, decided_by: str | None = None) -> None:
     for rel, data in snap.files.items():
         (files_dir / rel).parent.mkdir(parents=True, exist_ok=True)
         (files_dir / rel).write_bytes(data)
-    print(f"wrote Quickbase import CSVs and {len(snap.files)} evidence files to {dest}")
+    print(f"wrote Quickbase import CSVs and {len(snap.files)} evidence files to {dest.as_posix()}")
 
 
 def main(argv: list[str] | None = None) -> int:

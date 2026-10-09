@@ -1,5 +1,10 @@
 # inspection-reconcile
 
+[![ci](https://github.com/bochen2029-pixel/inspection-reconcile/actions/workflows/ci.yml/badge.svg)](https://github.com/bochen2029-pixel/inspection-reconcile/actions/workflows/ci.yml)
+![python 3.12 | 3.13](https://img.shields.io/badge/python-3.12%20%7C%203.13-3776ab)
+![Windows, macOS, Linux](https://img.shields.io/badge/os-Windows%20%7C%20macOS%20%7C%20Linux-555)
+[![license: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
+
 > Compare the work a project requires with the inspection records, documents and approvals actually captured.
 > Explain every gap with its source evidence, and never report "ready" on evidence the tool could not see.
 
@@ -18,7 +23,10 @@ Three facts drive the design:
 3. **Approvals go stale.** An approval covers a specific inspection revision and specific evidence bytes. A later
    change to either is detected.
 
-![The S02 report: one missing inspection found from the scope](docs/images/report-s02.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/report-s02-dark.png">
+  <img alt="The S02 report: BLOCKED, with one root failure. Obligation O-017 has no current inspection, found from the accepted scope, not from the records." src="docs/images/report-s02.png">
+</picture>
 
 ## Quick start
 
@@ -45,9 +53,38 @@ uv run inspection-reconcile assess --snapshot fixtures/scenarios/S02-missing-ins
 uv run inspection-reconcile assess --snapshot fixtures/scenarios/S06-corrected/snapshot \
     --policy policies/north-creek-demo.yml --out out/s06          # exit 0: READY_FOR_REVIEW
 
-# 4. What changed
-uv run inspection-reconcile compare --before out/s02 --after out/s06   # exactly R2-R6 for O-017
+# 4. What changed (exit 20: out/compare.json lists exactly R2-R6 for O-017 as changed)
+uv run inspection-reconcile compare --before out/s02 --after out/s06 --out out/compare.json
 ```
+
+## What the report shows
+
+Each report is one self-contained HTML file: no scripts, no external requests, and identical bytes on every
+operating system. Every finding carries its expected and observed values, a resolution and the source rows it
+cites.
+
+**An approval that no longer covers the evidence (S08).** The photo's bytes changed after the approval, while its
+revision label stayed the same. Digest binding catches it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/report-s08-root-dark.png">
+  <img alt="The S08 report: R6 FAIL EVIDENCE_CHANGED_SINCE_APPROVAL. The approved evidence digest differs from the current one." src="docs/images/report-s08-root.png">
+</picture>
+
+**Absence from a partial view is not absence (S05).** The capture was interrupted, so the four missing inspections
+are UNKNOWN, not FAIL, and the status is UNKNOWN rather than BLOCKED.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/report-s05-unknown-dark.png">
+  <img alt="The S05 report: UNKNOWN. Every dataset is partial (extraction_interrupted), with 4 root unknowns and no failures." src="docs/images/report-s05-unknown.png">
+</picture>
+
+**Every scenario against its oracle.** `demo --all` checks all 24 scenarios against the hand-written oracle and
+links each report, along with the S02 → S06 comparison.
+
+<img alt="The demo index: 24 scenarios, each matching its oracle status, and the S02 to S06 comparison listing R2-R6 of O-017." src="docs/images/demo-index.png">
+
+`tools/make_screenshots.py` regenerates these images from the tool's own output.
 
 ## Outcomes and statuses
 
@@ -137,17 +174,21 @@ document and the API portal's field-type pages, checked on 2026-10-09 (SPEC §12
   - streamed file downloads with a size cap;
   - token redaction.
 
+A capture needs two files of your own, both kept in the gitignored `local/` directory:
+- a capture configuration, copied from [docs/qb-capture.example.yml](docs/qb-capture.example.yml);
+- a field mapping with your app's table IDs, copied from `mappings/quickbase-demo.yml`.
+
+[docs/c3-runbook.md](docs/c3-runbook.md) covers both.
+
 ```bash
 # a Quickbase-shaped export, assessed through the field mapping (same identities as the canonical S01)
 uv run inspection-reconcile assess --export fixtures/scenarios/S16-quickbase-clean/export \
     --mapping mappings/quickbase-demo.yml --policy policies/north-creek-demo.yml --out out/s16
 
-# a read-only capture from your own Quickbase app; the token is read only from the environment
+# a read-only capture from your own Quickbase app; the token is read only from the environment (QB_USER_TOKEN)
 uv run inspection-reconcile capture-quickbase --config local/qb-capture.yml \
-    --mapping mappings/quickbase-demo.yml --out out/capture
+    --mapping local/quickbase-live.yml --out out/capture
 ```
-
-Copy [docs/qb-capture.example.yml](docs/qb-capture.example.yml) to start a capture configuration.
 
 **Status:** tested against a mock Quickbase app that follows the published OpenAPI contract. A capture of that mock
 app gives the same finding for every requirement as the canonical scenario. The capture has **not yet run against
@@ -178,9 +219,12 @@ from Appendix D of the spec.
 | `fixtures/` | the oracle and the 24 scenario snapshots and exports |
 | `policies/`, `mappings/` | the demonstration requirement packs and the Quickbase field mapping |
 | `sql/` | the SQL cross-check queries |
-| `docs/SPEC.md` | the normative specification |
+| `tools/` | the independent fixture generator and the screenshot script |
+| `docs/SPEC.md` | the normative specification; §22 is the amendment register |
 | `docs/decisions.md` | decisions and amendments |
+| `docs/status.md` | build steps, and the invariant and acceptance-criteria audit |
 | `docs/limitations.md` | what is verified, synthetic or unsupported |
+| `docs/c3-runbook.md` | step by step: the first run against a live Quickbase test app |
 
 ## Limitations
 

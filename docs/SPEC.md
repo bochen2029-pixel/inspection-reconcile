@@ -1979,7 +1979,7 @@ The evidence-set digest is `sha256:e1c7a825b339db9678f73f6c0bfd9139daaca6fab91d7
 
 ## Appendix D · Quickbase test-app blueprint *(normative for step C3)*
 
-Build the app in an account and realm you are authorized to use. Create the fields **in the order listed**: new fields take the next free ID starting at 6, so this order reproduces the §12.3 FIDs. When you create a relationship, add **no** lookup or summary fields in that dialog. Step C2 verifies every FID against `GET /fields`; any difference goes into a `mappings/quickbase-live.yml`, never into the demo mapping.
+Build the app in an account and realm you are authorized to use. Create the fields **in the order listed**: new fields take the next free ID starting at 6, so this order reproduces the §12.3 FIDs. When you create a relationship, add **no** lookup or summary fields in that dialog. Step C2 verifies every FID against `GET /fields`; any difference goes into a live mapping kept in the gitignored `local/quickbase-live.yml` (it holds the real table IDs), never into the demo mapping.
 
 | table | fields in creation order (type) |
 |---|---|
