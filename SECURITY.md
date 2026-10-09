@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems privately, through GitHub's **Report a vulnerability** button on this repository's
-Security tab. Do not open a public issue for a vulnerability. You should receive an answer within a week.
+Security tab. Do not open a public issue for a vulnerability.
 
 ## Supported versions
 
