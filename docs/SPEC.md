@@ -477,7 +477,7 @@ R0 runs in the fixed order below. Each step sees the quarantine decisions of the
 
 Group every row with a readable key, including rows quarantined in §7.5.1, by its key (§5.5). Each group of two or more rows yields one finding:
 - **subject** — the key;
-- **observed** — `{count, identical}`, where `identical` means every row has equal raw cells.
+- **observed** — `{count, identical}`, where `identical` means every row has equal raw schema cells (`x_` columns excluded, §5.4; AM-5).
 
 **Every row in the group is quarantined**, because the record's identity is ambiguous. Quarantined rows still resolve references (§7.5.6). A key held by a quarantined row is not "missing".
 
@@ -518,7 +518,7 @@ There is one finding per referencing row, and `observed.missing` lists each `{fi
 |---|---|
 | scope row | its `obligation_id` |
 | inspection row | its `obligation_id`; the empty set if that cell is null; **unattributable** if the cell is non-null but unreadable |
-| inspection entity (`MULTIPLE_CURRENT_REVISIONS`) | the union over its rows |
+| inspection entity (`MULTIPLE_CURRENT_REVISIONS`) | the union over its current rows (AM-5) |
 | artifact row or entity | the attribution of its inspection entity: the union of the readable, non-null `obligation_id`s of every inspection row with that `inspection_id`. **Unattributable** if the artifact's `inspection_id` cell is unreadable |
 | approval row | the attribution of its inspection entity. **Unattributable** if `inspection_id` is unreadable |
 | approval item row | the attribution of its approval's inspection entity, through approval rows with that `approval_id` |
@@ -673,7 +673,7 @@ Probe results are `Present(sha256, size)`, `Absent(case_hint?)`, `NoPath`, `Unre
 - **Revision binding.** In revision mode, items naming artifacts outside E(O) are ignored. An approval that also covered, say, an optional sketch still matches.
 - **Ordering.** Approvals that MISMATCH never supersede a MATCH: they concern different evidence.
 - **Values.**
-  - `expected` is `{approved_evidence_digests, approved_artifact_revisions}`: the distinct digests, and the distinct sorted revision lists, of the MISMATCH approvals in Acur.
+  - `expected` is `{approved_evidence_digests, approved_artifact_revisions}`: the distinct digests of the MISMATCH approvals in Acur, and the sorted list of their sorted revision lists, one per revision-mode MISMATCH approval and not deduplicated (§22.1, AM-5).
   - `observed` is `{binding, current_evidence_digest: D, current_artifact_revisions: sorted R(O), decision_approvals}`.
 - **Revision-mode PASS wording.** Its explanation states that byte changes under an unchanged revision label are undetectable in this mode.
 
@@ -745,7 +745,7 @@ The scheme string separates the domain and versions the format. Appendix B gives
 {
   "scheme": "inspection-reconcile/snapshot-semantic/v1",
   "project":  {"client_id", "name", "project_id", "synthetic"},
-  "scope":    null | {"accepted": null | {"at", "by", "reference"}, "rows": [...], "scope_revision"},
+  "scope":    null (no scope member) | {"accepted": null | {"at", "by", "reference"}, "rows": null (file absent) | [...], "scope_revision"},
   "datasets": {
     "inspections":    {"declared": null | {"basis": [...], "consistency", "coverage"}, "rows": [...]},
     "artifacts":      {"declared": ..., "rows": [...]},
@@ -762,7 +762,7 @@ The scheme string separates the domain and versions the format. Appendix B gives
 - **A quarantined row** is `{"quarantined": [sorted codes], "raw": {column: raw string or null}}`. A malformed row is `{"quarantined": ["MALFORMED_ROW"], "raw_cells": [...]}`.
 
 **Rules.**
-- **Sorting.** Every list is sorted by the canonical JSON of its elements. Basis lists are sorted.
+- **Sorting.** Every list is sorted by the canonical JSON of its elements, except a malformed row's `raw_cells`, which keeps file order (AM-5). Basis lists are sorted.
 - **Exclusions.** `x_` columns, per-record provenance (§5.9), locators, row numbers, paths, `snapshot_id`, `source`, capture times, the normalization file and the evidence root are all excluded.
 
 ### 8.5 Identities
@@ -1053,8 +1053,8 @@ The Phase B fixtures and the Phase C capture share this format:
 ```
 <export>/
   capture-manifest.json
-  tables/<role>/fields.json            GET /fields response, verbatim
-  tables/<role>/page-0001.json …       POST /records/query responses, verbatim, in order (pass 1)
+  tables/<role>/fields.json            GET /fields response (parsed JSON, re-serialized; AM-4)
+  tables/<role>/page-0001.json …       POST /records/query responses (parsed JSON, re-serialized), in order (pass 1)
   tables/<role>/pass2.json             second-pass {rid: date-modified} map (live capture only)
   files/<table_id>/<rid>/<fid>/v<version>/<file name>
 ```
@@ -2123,7 +2123,7 @@ Adopted on 2026-10-09 from an independent re-derivation of Appendix A (decision 
 
 ### 22.1 `expected` and `observed`
 
-Every finding uses the values below; any field not listed is `{}`. NOT_EVALUATED findings have `{}` for both. Lists are sorted by the canonical JSON of their elements unless an order is stated. Canonical JSON sorts `null` first. R0 findings that merge several rows carry `count`, the number of merged rows.
+Every finding uses the values below; any field not listed is `{}`. NOT_EVALUATED findings have `{}` for both. Lists are sorted by the canonical JSON of their elements unless an order is stated. In that byte order `null` sorts after strings, numbers, arrays and `false`, and before `true` and objects (AM-5). R0 findings that merge several rows carry `count`, the number of merged rows.
 
 | finding | `expected` | `observed` |
 |---|---|---|
@@ -2175,7 +2175,7 @@ Locators per finding: `{system, dataset, locator}`, where `system` is the manife
 | R3 | O's scope row(s), I's row, and the rows of I's current artifacts |
 | R4, R5 | I's row and the rows of E(O) |
 | R6 | I's row, the rows of A, and their approval-item rows |
-| R7 | the entity's current rows |
+| R7 | the entity's unmatched current rows (AM-5) |
 | NOT_EVALUATED | none |
 
 ### 22.3 Orders and reasons
@@ -2205,7 +2205,7 @@ When `evidence_files` is omitted, every probe returns Absent without touching th
 
 ### 22.7 Intended consequences *(informative)*
 
-- **A dangling reference** is attributed to the empty set, because its target does not exist, so the finding is advisory. Its uncertainty is carried by `COVERAGE_CONTRADICTED` on the target dataset (S20). It is not unattributable.
+- **A dangling reference on the attribution path** (an artifact or approval naming a missing inspection, S20) is attributed to the empty set, because its target does not exist, so the finding is advisory. Its uncertainty is carried by `COVERAGE_CONTRADICTED` on the target dataset. It is not unattributable. An approval item whose artifact reference dangles while its approval resolves keeps the approval's attribution (§7.5.7), so that finding can be required (AM-5).
 - **A row whose key cannot be read** is unattributable. It downgrades its whole dataset to partial, so every dependent check becomes UNKNOWN. This blast radius is deliberate under I-2.
 
 ### 22.8 Amendment AM-2: entity references resolve by the entity id
@@ -2222,7 +2222,47 @@ Found while implementing B1/B2:
 - **Scope filter.** `scope_filter.fid` is the obligations table's `project_id` field, and its value equals `project.project_id`.
 - **Derived fields.** `allow_derived` is a table-level boolean.
 - **Long file names.** The 8-hex-digit suffix is taken from the SHA-256 of the original (unsanitized) name in UTF-8.
-- **Export manifest.** `two_pass` is `not_run`, `stable` or `changed`. A `files[]` entry that is not `captured` has `path`, `bytes` and `sha256` set to null; a captured entry has all three and a safe relative path.
+- **Export manifest.** `two_pass` is `not_run`, `stable` or `changed`. A `files[]` entry that is not `captured` has `path`, `bytes` and `sha256` set to null (except `bytes` on a `too_large` entry, AM-4); a captured entry has all three and a safe relative path.
 - **`normalize` refuses an inconsistent export** (`EXPORT_INVALID`): page files that differ from `tables[role].pages`, a record count that differs from `retrieved`, captured bytes that differ from the declared size or SHA-256, an unmapped table or a mapped table missing, or a record lacking a mapped field.
+
+---
+
+### 22.10 Amendment AM-4: capture details (decision D-008)
+
+Found while implementing C2:
+
+- **Two-pass result.** A capture writes `two_pass` as `stable` or `changed`. `not_run` appears only in fixture exports. A table is `stable` only when three things hold: its pass-1 accounting held, its pass-2 read was complete, and both passes saw the same `{record id: date modified}` map.
+- **File entries.** The files of in-scope current artifacts are `captured`, `not_captured` (with `capture_files: false`), `too_large` or `error` (a failed download). Every other artifact file is `out_of_scope` and is not downloaded.
+  - An entry that is not `captured` has `path` and `sha256` null.
+  - Its `bytes` is null too, except on a `too_large` entry, which records the size received.
+  - `normalize` refuses any other combination (`EXPORT_INVALID`).
+- **Coverage declarations** (§12.5 step 6):
+  - **An incomplete read** is `partial` with `[pagination_incomplete]`.
+  - **A complete read** that is not stable, or not attested, is `unverified`. Its basis lists only the bases earned: `query_total_matched`, plus `two_pass_stable` and `operator_attestation` when earned.
+  - **Approval items.** The approvals declaration needs both the approvals and the approval-items tables to qualify.
+  - **`evidence_files`** copies the artifacts declaration while that is not complete. Otherwise it is `partial` in two cases: `[attachment_capture_skipped]` when `capture_files: false`, and `[extraction_interrupted]` when an in-scope file is `too_large` or `error`.
+- **Names and times.**
+  - `export_id` is `<project_id>-qb-<capture start in UTC as YYYYMMDDTHHMMSSZ>`.
+  - `source.description` is "Read-only capture of Quickbase app <app_id>".
+  - `capture.started_at` and `capture.ended_at` are canonical TS values.
+- **No keyset progress.** A non-empty page whose largest record ID does not exceed the previous `last` is an accounting failure. The read stops there, incomplete, instead of running on to `max_pages`.
+- **Stored responses.** `fields.json`, the page files and `pass2.json` hold the parsed responses, re-serialized as 2-space-indented UTF-8 JSON, not the raw response bytes. The HTTP client returns parsed JSON.
+
+---
+
+### 22.11 Amendment AM-5: engine review corrections (decision D-009)
+
+A third reviewer read every engine module against §7, §8 and §22 and reproduced each defect below with a controlled snapshot. Each one now has a regression test.
+
+- **The scope member in identities (§8.4).** `"scope"` is `null` only when the manifest has no scope member. A member whose file is absent digests as `{"accepted", "rows": null, "scope_revision"}`. R1 reads the member's `accepted` and `scope_revision` even without the file, so such snapshots must not share an `evaluation_id` with each other or with a snapshot that has no member.
+- **`identical` in `DUPLICATE_KEY` (§7.5.2)** compares schema cells only. Otherwise a normalized export's per-record `x_source` would make equal records differ, and an export would stop being equivalent to its canonical snapshot.
+- **Attribution through an inspection entity (§7.5.7)** uses every inspection row whose `inspection_id` cell is readable, whatever its revision cell, as AM-2 does for references. This was a code defect; the text already said so.
+- **Canonical order of `null` (§22.1).** Canonical-JSON byte order places `null` after strings, numbers, arrays and `false`, and before `true` and objects. The sentence "Canonical JSON sorts `null` first" was wrong and is replaced.
+- **Wording only, no behavior change:**
+  - §7.11: `approved_artifact_revisions` is not deduplicated, as §22.1 states.
+  - §22.7: the dangling-reference sentence covers only the attribution path.
+  - §22.2: R7 cites the unmatched current rows.
+  - §7.5.7: a `MULTIPLE_CURRENT_REVISIONS` entity unions its current rows.
+  - §8.4: a malformed row's `raw_cells` keeps file order.
 
 *End of specification v3.0.*

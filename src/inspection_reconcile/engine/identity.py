@@ -50,10 +50,10 @@ def snapshot_semantic(
         return sort_canonical(_row_object(r, evidence) for r in integrity.rows[dataset])
 
     scope: dict[str, Any] | None = None
-    if snapshot.scope_present and snapshot.scope is not None:
+    if snapshot.scope is not None:  # a member whose file is absent still identifies the evaluation (AM-5)
         scope = {
             "accepted": snapshot.scope.accepted,
-            "rows": rows("scope"),
+            "rows": rows("scope") if snapshot.scope_present else None,
             "scope_revision": snapshot.scope.scope_revision,
         }
     project = snapshot.project

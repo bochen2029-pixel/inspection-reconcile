@@ -22,6 +22,7 @@ from inspection_reconcile.adapters.qb_export import (
     json_text,
     latest_version,
     normalize,
+    parse_export_manifest,
     placeholder,
     reference_rid,
     sanitize_file_name,
@@ -417,6 +418,28 @@ def test_an_uncaptured_file_is_not_copied(tmp_path: Path, mapping: Mapping) -> N
     assert not (out / "evidence" / "files" / "bsyn00003" / "201").exists()
     keys = {f.key: f for f in run(out).findings}
     assert keys["R5:obligation:O-001"].reason == "NOT_CAPTURED"
+
+
+@pytest.mark.parametrize(
+    ("status", "change", "accepted"),
+    [
+        ("not_captured", {"sha256": "0" * 64}, False),
+        ("out_of_scope", {"path": "files/bsyn00003/201/13/v1/report.pdf"}, False),
+        ("error", {"bytes": 10}, False),
+        ("too_large", {"bytes": 10}, True),
+    ],
+)
+def test_an_uncaptured_entry_carries_no_capture_values(
+    status: str, change: dict[str, Any], accepted: bool
+) -> None:
+    manifest = json.loads((S16 / "capture-manifest.json").read_text(encoding="utf-8"))
+    manifest["files"][0].update({"status": status, "path": None, "bytes": None, "sha256": None, **change})
+    if accepted:
+        parse_export_manifest(manifest)
+        return
+    with pytest.raises(RunError) as info:
+        parse_export_manifest(manifest)
+    assert "(AM-4)" in info.value.message
 
 
 def test_corrupted_captured_bytes_are_refused(tmp_path: Path, mapping: Mapping) -> None:

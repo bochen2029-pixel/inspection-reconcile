@@ -63,6 +63,13 @@ def validate_row(raw: RawRow, unmapped: frozenset[tuple[str, str, str]]) -> Row:
     return Row(dataset, raw, values, violations, key, link_readable, quarantine)
 
 
+def schema_cells(row: Row) -> tuple[str | None, ...]:
+    """The row's schema cells; `x_` provenance columns are excluded (§5.4, §7.5.2, AM-5)."""
+    cells = row.raw.cells
+    assert cells is not None  # a row with a readable key is never malformed
+    return tuple(cells[c] for c, _, _ in SCHEMAS[row.dataset])
+
+
 def subject_id_for_key(dataset: str, key: tuple[str, ...]) -> str:
     if dataset in ("inspections", "artifacts"):
         return f"{key[0]}@{key[1]}"
@@ -217,7 +224,7 @@ class Integrity:
                 acc = self._acc(SUBJECT_KIND_FOR_DATASET[d], subject_id_for_key(d, key), "DUPLICATE_KEY")
                 acc.rows.extend(members)
                 acc.extra = {
-                    "identical": len({m.raw.raw_cells for m in members}) == 1,
+                    "identical": len({schema_cells(m) for m in members}) == 1,
                     "key": key,
                     "dataset": d,
                 }
@@ -310,11 +317,12 @@ class Integrity:
     def attribution_maps(self) -> tuple[dict[str, set[str]], dict[str, list[str | None]]]:
         entity: dict[str, set[str]] = defaultdict(set)
         for row in self.rows["inspections"]:
-            if row.key is None:
+            ident = row.values.get("inspection_id")  # the entity id cell, whatever the revision cell (AM-2)
+            if not isinstance(ident, str):
                 continue
             ob = row.values.get("obligation_id")
             if isinstance(ob, str):
-                entity[row.key[0]].add(ob)
+                entity[ident].add(ob)
         approval_links: dict[str, list[str | None]] = defaultdict(list)
         for row in self.rows["approvals"]:
             if row.key is None:

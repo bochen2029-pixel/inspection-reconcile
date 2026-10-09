@@ -141,6 +141,10 @@ def _file_entry(value: Any, where: str) -> dict[str, Any]:
             raise v.fail(where, "a captured file needs path, bytes and sha256")
         if grammar.path_violation(body["path"]) is not None:
             raise v.fail(where, f"path {body['path']!r} is not a safe relative path")
+    elif body["path"] is not None or body["sha256"] is not None:
+        raise v.fail(where, f"a {body['status']} file has no path or sha256 (AM-4)")
+    elif body["bytes"] is not None and body["status"] != "too_large":
+        raise v.fail(where, f"a {body['status']} file has no bytes; only too_large records the size (AM-4)")
     return body
 
 

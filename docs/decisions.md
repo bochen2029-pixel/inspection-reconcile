@@ -56,3 +56,26 @@ Gaps found while implementing B1/B2 (G1-G6), adopted with the conservative readi
 Two other Claude Code sessions of the same operator work on claimed, file-scoped tasks in separate git worktrees
 (T2: the HTTP client; T3: mapping, normalize and capture; T4: SQL export). The main session reviews and merges
 each branch. The helpers also re-derived the oracle independently (T1, D-003).
+
+## D-008 · 2026-10-09 · Amendment AM-4: capture details (SPEC §12.2, §12.5, §22.10)
+Choices made while implementing C2 (C-1 to C-6), adopted as written:
+- **C-1, the two-pass result.** A capture writes `stable` or `changed`.
+- **C-2, file entries.** An uncaptured entry carries no `path` or `sha256`. Only `too_large` records `bytes`.
+  `normalize` now enforces this.
+- **C-3, coverage declarations.** These cover what each incomplete, unstable, unattested, skipped or failed case
+  declares.
+- **C-4, names and times.** The `export_id` and description formats.
+- **C-5, a stalled keyset.** A non-empty page without keyset progress stops the read as an accounting failure.
+- **C-6, stored responses.** Captured responses are parsed and re-serialized, not raw bytes.
+
+## D-009 · 2026-10-09 · Amendment AM-5: engine review corrections (SPEC §7.5.2, §7.5.7, §8.4, §22.1, §22.11)
+A spec-only review of every engine module found three defects. None of them is reached by any oracle scenario:
+- **The scope member.** A declared scope member with an absent file hashed like no member at all, so different
+  evaluations shared one `evaluation_id`.
+- **`DUPLICATE_KEY` comparisons.** `identical` compared `x_` provenance columns.
+- **Entity attribution.** It ignored inspection rows whose revision cell was unreadable, which AM-2 had already
+  ruled out for references.
+
+The review also found one false sentence, about the sort position of `null`, and five wording ambiguities. All
+are fixed, each defect with a regression test that fails on the old code. No oracle entry, vector or fixture
+identity changed.
