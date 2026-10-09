@@ -26,6 +26,8 @@ Reading reports and acting on findings is covered by the [User Guide](user-guide
 | [docs/limitations.md](../limitations.md) | what is verified, what is synthetic and what is unsupported |
 | [docs/c3-runbook.md](../c3-runbook.md) | the step-by-step live verification against a Quickbase test app |
 | [docs/status.md](../status.md) | the build steps, and which test proves each invariant and acceptance criterion |
+| [SECURITY.md](../../SECURITY.md) | how to report a vulnerability privately |
+| [CHANGELOG.md](../../CHANGELOG.md) | what changed in each release |
 
 > [!NOTE]
 > All data in the repository is synthetic: the fictional North Creek project (NC-001). Quickbase is a trademark of
@@ -601,6 +603,8 @@ The expected result is `READY_FOR_REVIEW`, with no finding added, removed or cha
 
 ## Security model
 
+To report a vulnerability, follow [SECURITY.md](../../SECURITY.md): reports are private, never public issues.
+
 ### Read-only by construction
 
 The capture client can issue exactly four operations:
@@ -823,8 +827,11 @@ The CI workflow runs the linters, the type checker, the full test suite and `dem
 each with Python 3.12 and 3.13. A final job checks that every platform produced identical evaluation identities and
 report digests.
 
-The demonstration site publishes the output of `demo --all`: every scenario's report and the index. It is deployed by
-a workflow that runs only after CI has passed on a push to the main branch.
+The demonstration site,
+[bochen2029-pixel.github.io/inspection-reconcile](https://bochen2029-pixel.github.io/inspection-reconcile/), publishes
+the output of `demo --all`: every scenario's report and the index. It is deployed by a workflow that runs only after
+CI has passed on a push to the main branch, and only `demo --all` itself decides what is published: any scenario
+that departs from its oracle fails the deployment.
 
 ### Rebuilding the screenshots and these guides
 

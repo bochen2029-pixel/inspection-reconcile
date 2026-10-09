@@ -121,6 +121,11 @@ Open `out/demo/index.html` in a browser. Each scenario links to its own report.
 
 Start with S02, the classic case: one inspection was never recorded.
 
+> [!TIP]
+> The same reports are published online at
+> [bochen2029-pixel.github.io/inspection-reconcile](https://bochen2029-pixel.github.io/inspection-reconcile/),
+> rebuilt from the main branch after every successful test run, so you can browse them before installing anything.
+
 ## Key ideas
 
 ### Obligations, records and evidence
