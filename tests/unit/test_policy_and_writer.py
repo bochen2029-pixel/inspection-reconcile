@@ -98,3 +98,23 @@ def test_write_files_bytes_exact(tmp_path):
     assert (out / "a.json").read_bytes() == b'{"x": 1}\n'
     assert (out / "sub" / "b.html").read_bytes() == "é\n".encode()
     assert not list(out.glob("*.tmp.*"))
+
+
+def test_a_failed_write_leaves_neither_partial_outputs_nor_temporary_files(tmp_path, monkeypatch):
+    import os
+
+    real_replace = os.replace
+    calls = []
+
+    def failing_replace(src, dst):
+        calls.append(dst)
+        if len(calls) == 2:
+            raise OSError(28, "No space left on device")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", failing_replace)
+    out = tmp_path / "o"
+    with pytest.raises(RunError) as err:
+        write_files(out, {"a.json": b"{}\n", "b.json": b"{}\n", "c.json": b"{}\n"})
+    assert err.value.code == "WRITE_FAILED"
+    assert sorted(p.name for p in out.iterdir()) == []  # a.json was undone; no .tmp file is left
